@@ -6,7 +6,7 @@ on:
 
 env:
   #
-  #REMOTE_REPOSITORY: danpawlik/openwrt
+  #REMOTE_REPOSITORY: ww1150/openwrt
   #REMOTE_BRANCH: main-mt76-fw
   #
   REMOTE_REPOSITORY: openwrt/openwrt
@@ -60,24 +60,24 @@ jobs:
 
       - name: Configure firmware image
         run: |
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/mediatek/mt7988a/bpi-r4 > .config
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/main-router >> .config
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/snapshot >> .config
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/optimize >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/mediatek/mt7988a/bpi-r4 > .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
 
       - name: Enable MLO
         run: |
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/mlo >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
 
       - name: Enable openssl
         run: |
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/openssl >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
       #- name: Enable wolfssl
       #  run: |
       #    sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
-      #    curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/wolfssl >> .config
+      #    curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/wolfssl >> .config
 
       #
       ### EEPROM FIX ###
