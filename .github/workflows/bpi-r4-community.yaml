@@ -87,9 +87,6 @@ jobs:
 
       - name: Build the firmware image
         run: make -j $(nproc) defconfig download world
-        env:
-          PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          EXTRA_LDFLAGS: "-lgcc"
 
       - name: Compress all packages
         run: |
