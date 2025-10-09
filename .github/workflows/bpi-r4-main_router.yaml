@@ -83,7 +83,7 @@ jobs:
       # From https://github.com/LorenzoBianconi/wireless-next/commit/3e444c68513934d47b019b236ad083c386b0d85b
       - name: Copy patches for WED kernel traceback
         run: |
-          curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/patches/999-use-proper-wed-reference-in-wed-kernel.patch > target/linux/mediatek/patches-6.12/999-use-proper-wed-reference-in-wed-kernel.patch
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-use-proper-wed-reference-in-wed-kernel.patch > target/linux/mediatek/patches-6.12/999-use-proper-wed-reference-in-wed-kernel.patch
           curl -SL https://github.com/LorenzoBianconi/mt76/commit/92f22edf7fd119cde26218a7431919e4cdf1628e.patch > package/kernel/mt76/patches/999-use-proper-wed-reference-in-wed-mt76.patch
 
 
