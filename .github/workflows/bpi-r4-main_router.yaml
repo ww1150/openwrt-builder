@@ -53,9 +53,19 @@ jobs:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
+      - name: Add custom feeds
+        run: |
+          echo 'src-git zapret https://github.com/remittor/zapret-openwrt.git' >> feeds.conf.default
+
+      - name: Clone single packages
+        run: |
+          git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+
       - name: Update and install feeds
         run: |
           ./scripts/feeds update -a
+          ./scripts/feeds install zapret
+          ./scripts/feeds install luci-app-zapret
           ./scripts/feeds install -a
 
       - name: Configure firmware image
@@ -138,7 +148,7 @@ jobs:
 
   release:
     name: Create release
-    needs: [build, check_commits]
+    needs: [ build, check_commits ]
     if: needs.build.result == 'success'
     runs-on: ubuntu-24.04
     steps:
