@@ -57,16 +57,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            # Директории, которые нужно кэшировать
             dl
             feeds
           key: ${{ runner.os }}-feeds-${{ hashFiles('feeds.conf.default') }}
           restore-keys: |
             ${{ runner.os }}-feeds-
-
-      - name: Use GitHub mirrors for feeds
-        run: |
-          sed -i 's/git.openwrt.org/github.com\/openwrt/g' feeds.conf.default
 
       - name: Add custom feeds
         run: |
@@ -76,11 +71,20 @@ jobs:
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-      - name: Update and install feeds
+      - name: Update and install feeds (with fallback to GitHub mirrors)
         run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install zapret
-          ./scripts/feeds install luci-app-zapret
+          if ./scripts/feeds update -a; then
+            echo "Successfully updated feeds from official sources."
+          else
+            echo "Official feeds update failed. Switching to GitHub mirrors and retrying."
+            sed -i 's|git.openwrt.org/feed/\(.*\.git\)|github.com/openwrt/\1|' feeds.conf.default
+            sed -i 's|git.openwrt.org/project/\(.*\.git\)|github.com/openwrt/\1|' feeds.conf.default
+            echo "Updated feeds.conf.default:"
+            cat feeds.conf.default
+            ./scripts/feeds update -a
+          fi
+
+          echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
       - name: Configure firmware image
