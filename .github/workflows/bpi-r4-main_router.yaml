@@ -94,6 +94,12 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
 
+      - name: Add packages for rootfs expansion
+        run: |
+          echo "CONFIG_PACKAGE_cloud-utils-growpart=y" >> .config
+          echo "CONFIG_PACKAGE_util-linux-fdisk=y" >> .config
+          echo "CONFIG_PACKAGE_e2fsprogs=y" >> .config
+
       - name: Enable MLO
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
@@ -141,6 +147,36 @@ jobs:
           mkdir -p package/boot/uboot-mediatek/patches
           curl -SL "https://github.com/frank-w/u-boot/commit/de965eb469981e5dc92ed996e83fa4f60fa2242e.patch" > package/boot/uboot-mediatek/patches/910-uboot-fix-dts-node-name.patch
           curl -SL "https://github.com/frank-w/u-boot/commit/7b03460c27dc432ff67a054e66d9b211638cebd7.patch" > package/boot/uboot-mediatek/patches/920-uboot-add-8gb-ram-support.patch
+      - name: Create rootfs expansion script
+        run: |
+          mkdir -p files/etc
+          cat << 'EOF' > files/etc/rc.local
+          FLAG_FILE="/root/.rootfs_expanded"
+
+          if [ ! -f "$FLAG_FILE" ]; then
+              ROOT_DEV="/dev/mmcblk0"
+              ROOT_PART_NUM="2"
+
+              echo "Expanding ${ROOT_DEV} partition ${ROOT_PART_NUM}..."
+              growpart $ROOT_DEV $ROOT_PART_NUM || echo "growpart failed, rebooting in 15s" && sleep 15 && reboot
+
+              echo "Resizing filesystem on ${ROOT_DEV}p${ROOT_PART_NUM}..."
+              resize2fs "${ROOT_DEV}p${ROOT_PART_NUM}" || echo "resize2fs failed, rebooting in 15s" && sleep 15 && reboot
+
+              echo "Freespace expansion complete. Creating flag file and rebooting."
+              touch "$FLAG_FILE"
+
+              reboot
+          fi
+          
+          exit 0
+          EOF
+
+          chmod +x files/etc/rc.local
+          
+          echo "--- Content of /etc/rc.local ---"
+          cat files/etc/rc.local
+          echo "--------------------------------"
 
       - name: Add librespeed-go
         run: |
