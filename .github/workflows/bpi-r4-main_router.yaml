@@ -136,7 +136,11 @@ jobs:
           mkdir -p package/kernel/mt76/patches
           curl -SL https://github.com/openwrt/mt76/commit/aaf90b24fde77a38ee9f0a60d7097ded6a94ad1f.patch > package/kernel/mt76/patches/001-use-tx_power-from-default-fw-if-EEPROM-contains-0s-im-0.patch
 
-      #################
+      - name: Add U-Boot patches for 8GB RAM support
+        run: |
+          mkdir -p package/boot/uboot-mediatek/patches
+          curl -SL "https://github.com/frank-w/u-boot/commit/de965eb469981e5dc92ed996e83fa4f60fa2242e.patch" > package/boot/uboot-mediatek/patches/910-uboot-fix-dts-node-name.patch
+          curl -SL "https://github.com/frank-w/u-boot/commit/7b03460c27dc432ff67a054e66d9b211638cebd7.patch" > package/boot/uboot-mediatek/patches/920-uboot-add-8gb-ram-support.patch
 
       - name: Add librespeed-go
         run: |
