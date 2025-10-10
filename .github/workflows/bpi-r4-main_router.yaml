@@ -191,9 +191,9 @@ jobs:
         with:
           files: bin/targets/mediatek/filogic/*
           tag_name: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-${{ env.RELEASE_DATE }}
-          name: OpenWRT BPI-R4 + MLO + main_router packages + GCC15 + WED 4GB patch - ${{ env.REMOTE_BRANCH }} - ${{ env.RELEASE_DATE }}
+          name: OpenWRT BPI-R4 + MLO + main_router packages + GCC15 + WED 4GB patch + 8GB RAM support - ${{ env.REMOTE_BRANCH }} - ${{ env.RELEASE_DATE }}
           body: |
-            Updated prebuilt images with main_router packages, patches for working 4GB RAM WED  build with GCC14 - ${{ env.RELEASE_DATE }},
+            Updated prebuilt images with main_router packages, patches for working 4GB RAM WED + 8GB RAM support build with GCC14 - ${{ env.RELEASE_DATE }},
             Build Commit: ${{ needs.check_commits.outputs.latest_commit_sha }}
 
       - name: Clean up old releases
