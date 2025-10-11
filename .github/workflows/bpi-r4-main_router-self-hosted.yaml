@@ -176,9 +176,6 @@ jobs:
 
       - name: Test ONLY the U-Boot package compilation (Correct Method)
         run: |
-#          echo "--- Preparing host tools required for the build... ---"
-#          make tools/install -j $(nproc)
-
           echo "--- Compiling U-Boot package... ---"
           make package/uboot-mediatek/compile V=s
 
