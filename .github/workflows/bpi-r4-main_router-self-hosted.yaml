@@ -179,15 +179,15 @@ jobs:
 
       - name: Test ONLY the U-Boot package compilation
         run: |
-          # --- Шаг 1: Полностью очищаем любые предыдущие попытки сборки U-Boot ---
-          # Используем правильный путь: package/boot/uboot-mediatek
+          # --- Шаг 1: Очищаем предыдущую попытку сборки U-Boot ---
+          # Используем правильный путь и правильную команду 'clean'.
           echo "--- Cleaning up previous U-Boot build attempt... ---"
-          make package/boot/uboot-mediatek/dirclean V=s
+          make package/uboot-mediatek/clean V=s
           
           # --- Шаг 2: Запускаем компиляцию только пакета U-Boot ---
-          # Используем правильный путь: package/boot/uboot-mediatek
+          # Используем правильный путь.
           echo "--- Starting compilation of the U-Boot package... ---"
-          make package/boot/uboot-mediatek/compile V=s
+          make package/uboot-mediatek/compile V=s
 
       - name: Remove packages that are marked as modules
         run: |
