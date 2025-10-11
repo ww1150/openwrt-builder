@@ -53,16 +53,6 @@ jobs:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
-      - name: Setup feed cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            dl
-            feeds
-          key: ${{ runner.os }}-feeds-${{ hashFiles('feeds.conf.default') }}
-          restore-keys: |
-            ${{ runner.os }}-feeds-
-
       - name: Add custom feeds
         run: |
           echo 'src-git zapret https://github.com/remittor/zapret-openwrt.git' >> feeds.conf.default
@@ -164,40 +154,19 @@ jobs:
           mkdir -p package/kernel/mt76/patches
           curl -SL https://github.com/openwrt/mt76/commit/aaf90b24fde77a38ee9f0a60d7097ded6a94ad1f.patch > package/kernel/mt76/patches/001-use-tx_power-from-default-fw-if-EEPROM-contains-0s-im-0.patch
 
-      - name: Create rootfs expansion script
-        run: |
-          mkdir -p files/etc
-          cat << 'EOF' > files/etc/rc.local
-          FLAG_FILE="/root/.rootfs_expanded"
-
-          if [ ! -f "$FLAG_FILE" ]; then
-              ROOT_DEV="/dev/mmcblk0"
-              ROOT_PART_NUM="2"
-
-              echo "Expanding ${ROOT_DEV} partition ${ROOT_PART_NUM}..."
-              growpart $ROOT_DEV $ROOT_PART_NUM || echo "growpart failed, rebooting in 15s" && sleep 15 && reboot
-
-              echo "Resizing filesystem on ${ROOT_DEV}p${ROOT_PART_NUM}..."
-              resize2fs "${ROOT_DEV}p${ROOT_PART_NUM}" || echo "resize2fs failed, rebooting in 15s" && sleep 15 && reboot
-
-              echo "Freespace expansion complete. Creating flag file and rebooting."
-              touch "$FLAG_FILE"
-
-              reboot
-          fi
-          
-          exit 0
-          EOF
-
-          chmod +x files/etc/rc.local
-          
-          echo "--- Content of /etc/rc.local ---"
-          cat files/etc/rc.local
-          echo "--------------------------------"
-
       - name: Add librespeed-go
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
+
+      - name: Select 8GB board variant in .config
+        run: |
+          sed -i 's/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=y/# CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=y is not set/' .config
+
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y" >> .config
+          
+          echo "--- .config after selecting 8GB variant ---"
+          grep "bpi-r4" .config
+          echo "----------------------------------------"
 
       - name: Run defconfig
         run: |
