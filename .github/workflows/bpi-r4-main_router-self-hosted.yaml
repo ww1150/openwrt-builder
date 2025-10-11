@@ -148,7 +148,7 @@ jobs:
           git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
           
           echo "Overwriting the source archive with custom content..."
-          (cd custom-u-boot-source && tar -cjf ./dl/u-boot-2025.10.tar.bz2 .)
+          (cd custom-u-boot-source && tar -cjf ../dl/u-boot-2025.10.tar.bz2 .)
           
           echo "Calculating SHA256 hash of the new archive..."
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
