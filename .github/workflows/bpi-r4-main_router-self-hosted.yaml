@@ -138,9 +138,9 @@ jobs:
         run: |
           make defconfig
 
-      - name: Download all sources and build host tools
+      - name: Build host tools with official sources
         run: |
-          make download -j$(nproc)
+          make tools/install -j$(nproc)
 
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
@@ -169,9 +169,6 @@ jobs:
 
       - name: Test ONLY the U-Boot package compilation
         run: |
-          echo "--- Preparing host tools required for the build... ---"
-          make tools/install -j$(nproc)
-
           echo "--- Compiling U-Boot package... ---"
           make package/uboot-mediatek/compile V=s
 
