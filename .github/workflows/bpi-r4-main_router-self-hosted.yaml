@@ -130,7 +130,7 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
 
-      - name: Prepare custom U-Boot source for the original package
+      - name: Prepare custom U-Boot source and fix build configuration
         run: |
           # --- Шаг 1: Создаем директорию для загрузок, если ее нет ---
           echo "Ensuring the 'dl' directory exists..."
@@ -145,9 +145,20 @@ jobs:
           (cd custom-u-boot-source && tar -cjf ../dl/u-boot-2025.10.tar.bz2 .)
           
           # --- Шаг 4: Вычисляем хеш-сумму нашего нового архива ---
-          echo "Calculating SHA265 hash of the new archive..."
+          echo "Calculating SHA256 hash of the new archive..."
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
           echo "New hash is: $CUSTOM_HASH"
+          
+          # --- Шаг 5: Обновляем ОРИГИНАЛЬНЫЙ Makefile ---
+          echo "Updating the original U-Boot Makefile..."
+          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
+          
+          # <<< НОВАЯ ПРОВЕРКА НАДЁЖНОСТИ >>>
+          # Проверяем, существует ли файл, прежде чем пытаться его изменить.
+          if [ ! -f "$UBOOT_MAKEFILE" ]; then
+            echo "::error::Makefile not found at path: $UBOOT_MAKEFILE"
+            exit 1
+          fi
           
           # 5a: Вставляем наш кастомный хеш
           sed -i "s/PKG_HASH:=.*/PKG_HASH:=${CUSTOM_HASH}/" "$UBOOT_MAKEFILE"
