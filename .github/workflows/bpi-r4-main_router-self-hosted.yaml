@@ -130,44 +130,41 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
 
+      - name: Remove packages that are marked as modules
+        run: |
+          grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
+
+      - name: Download all sources and build host tools
+        run: |
+          make download
+
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
-          # --- Шаг 1: Создаем директорию для загрузок, если ее нет ---
           echo "Ensuring the 'dl' directory exists..."
           mkdir -p dl
           
-          # --- Шаг 2: Клонируем нужный репозиторий и ветку ---
           echo "Cloning frank-w/u-boot repository, branch 2025-10-bpi..."
           git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
           
-          # --- Шаг 3: Создаем архив с тем именем, которое ожидает система ---
           echo "Creating source archive with custom content..."
           (cd custom-u-boot-source && tar -cjf ../dl/u-boot-2025.10.tar.bz2 .)
           
-          # --- Шаг 4: Вычисляем хеш-сумму нашего нового архива ---
           echo "Calculating SHA256 hash of the new archive..."
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
           echo "New hash is: $CUSTOM_HASH"
           
-          # --- Шаг 5: Обновляем ОРИГИНАЛЬНЫЙ Makefile ---
           echo "Updating the original U-Boot Makefile..."
           UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
           
-          # <<< НОВАЯ ПРОВЕРКА НАДЁЖНОСТИ >>>
-          # Проверяем, существует ли файл, прежде чем пытаться его изменить.
           if [ ! -f "$UBOOT_MAKEFILE" ]; then
             echo "::error::Makefile not found at path: $UBOOT_MAKEFILE"
             exit 1
           fi
           
-          # 5a: Вставляем наш кастомный хеш
           sed -i "s/PKG_HASH:=.*/PKG_HASH:=${CUSTOM_HASH}/" "$UBOOT_MAKEFILE"
           
-          # 5b: <<< КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ! >>>
-          # Заставляем OpenWrt использовать правильное, короткое имя конфигурации
           sed -i "s/UBOOT_CONFIG:=mt7988a_bananapi_bpi-r4-emmc/UBOOT_CONFIG:=mt7988a_bpir4_emmc/" "$UBOOT_MAKEFILE"
           
-          # --- Шаг 6: Проверяем, что получилось ---
           echo "--- Verifying final Makefile ---"
           grep "PKG_HASH" "$UBOOT_MAKEFILE"
           grep "UBOOT_CONFIG:=mt7988a_bpir4_emmc" "$UBOOT_MAKEFILE"
@@ -179,22 +176,14 @@ jobs:
 
       - name: Test ONLY the U-Boot package compilation (Correct Method)
         run: |
-          # --- Шаг 1: Собираем и устанавливаем только хост-инструменты ---
-          # Эта команда соберет libdeflate-gzip и другие утилиты, не трогая пакеты прошивки.
-          echo "--- Preparing host tools required for the build... ---"
-          make tools/install -j$(nproc) V=s
+#          echo "--- Preparing host tools required for the build... ---"
+#          make tools/install -j $(nproc)
 
-          # --- Шаг 2: Компиляция только пакета U-Boot ---
-          # Теперь, когда все инструменты гарантированно на месте, эта команда сработает.
           echo "--- Compiling U-Boot package... ---"
           make package/uboot-mediatek/compile V=s
 
-      - name: Remove packages that are marked as modules
-        run: |
-          grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
-
       - name: Build the firmware image
-        run: make -j $(nproc) defconfig download world
+        run: make -j $(nproc) world
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
