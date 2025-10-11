@@ -136,7 +136,7 @@ jobs:
 
       - name: Download all sources and build host tools
         run: |
-          make download
+          make -j $(nproc) defconfig download
 
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
@@ -169,9 +169,6 @@ jobs:
           grep "PKG_HASH" "$UBOOT_MAKEFILE"
           grep "UBOOT_CONFIG:=mt7988a_bpir4_emmc" "$UBOOT_MAKEFILE"
           echo "------------------------------"
-
-      - name: Run defconfig
-        run: |
           make defconfig
 
       - name: Test ONLY the U-Boot package compilation (Correct Method)
