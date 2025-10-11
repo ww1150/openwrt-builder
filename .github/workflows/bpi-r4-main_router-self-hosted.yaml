@@ -162,11 +162,17 @@ jobs:
         run: |
           make defconfig
 
-      - name: Patch DTS file for 8GB RAM support
+      - name: Patch DTS file for 8GB RAM support (correct path)
         run: |
-          DTS_FILE="target/linux/mediatek/dts/mt7988a-bananapi-bpi-r4.dts"
+          DTS_FILE=$(find target/linux/mediatek/files-*/arch/arm64/boot/dts/mediatek/ -name "mt7988a-bananapi-bpi-r4.dts")
           
-          echo "Patching $DTS_FILE for 8GB RAM..."
+          if [ -z "$DTS_FILE" ]; then
+            echo "::error::DTS file for BPI-R4 not found even after a clean checkout!"
+            exit 1
+          fi
+
+          echo "Found DTS file at: $DTS_FILE"
+          echo "Patching for 8GB RAM..."
           
           sed -i 's/0x100000000>; \/\* 4 GiB \*\//0x200000000>; \/\* 8 GiB \*\//' "$DTS_FILE"
           
