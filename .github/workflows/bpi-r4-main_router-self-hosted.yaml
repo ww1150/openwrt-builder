@@ -177,19 +177,16 @@ jobs:
         run: |
           make defconfig
 
-      - name: Test ONLY the U-Boot package compilation
+      - name: Test ONLY the U-Boot package compilation (Correct Method)
         run: |
-          # --- Шаг 1: Очищаем предыдущую попытку сборки U-Boot ---
-          # Используем правильный путь и правильную команду 'clean'.
-          echo "--- Cleaning up previous U-Boot build attempt... ---"
-          make package/uboot-mediatek/clean V=s
-          
-          echo "--- Preparing build environment and host tools... ---"
-          make download
-          
-          # --- Шаг 2: Запускаем компиляцию только пакета U-Boot ---
-          # Используем правильный путь.
-          echo "--- Starting compilation of the U-Boot package... ---"
+          # --- Шаг 1: Собираем и устанавливаем только хост-инструменты ---
+          # Эта команда соберет libdeflate-gzip и другие утилиты, не трогая пакеты прошивки.
+          echo "--- Preparing host tools required for the build... ---"
+          make tools/install -j$(nproc) V=s
+
+          # --- Шаг 2: Компиляция только пакета U-Boot ---
+          # Теперь, когда все инструменты гарантированно на месте, эта команда сработает.
+          echo "--- Compiling U-Boot package... ---"
           make package/uboot-mediatek/compile V=s
 
       - name: Remove packages that are marked as modules
