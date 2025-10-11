@@ -138,13 +138,11 @@ jobs:
         run: |
           make defconfig
 
-      - name: Cache build environment (tools and toolchain)
-        id: cache-env # Даем шагу ID
-        uses: actions/cache@v4
+      - name: Restore build environment cache
+        id: cache-env-restore
+        uses: actions/cache/restore@v4
         with:
-          # Ключ кэша зависит от ОС и хэшей ключевых файлов конфигурации.
           key: ${{ runner.os }}-build-env-${{ hashFiles('tools/Makefile', 'toolchain/Makefile', '.config') }}
-          # Пути, которые мы кэшируем:
           path: |
             staging_dir
             build_dir/host
@@ -155,6 +153,17 @@ jobs:
         if: steps.cache-env.outputs.cache-hit != 'true'
         run: |
           make prereq -j$(nproc)
+
+      - name: Save build environment cache
+        if: steps.cache-env-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.cache-env-restore.outputs.cache-primary-key || format('{0}-{1}', runner.os, 'build-env-') }}
+          path: |
+            staging_dir
+            build_dir/host
+            tools
+            toolchain
 
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
