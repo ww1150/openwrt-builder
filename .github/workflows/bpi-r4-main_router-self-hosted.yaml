@@ -149,14 +149,17 @@ jobs:
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
           echo "New hash is: $CUSTOM_HASH"
           
-          # --- Шаг 5: Обновляем ОРИГИНАЛЬНЫЙ Makefile, чтобы он использовал наш хеш ---
-          echo "Updating the original U-Boot Makefile with the new hash..."
-          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
+          # 5a: Вставляем наш кастомный хеш
           sed -i "s/PKG_HASH:=.*/PKG_HASH:=${CUSTOM_HASH}/" "$UBOOT_MAKEFILE"
+          
+          # 5b: <<< КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ! >>>
+          # Заставляем OpenWrt использовать правильное, короткое имя конфигурации
+          sed -i "s/UBOOT_CONFIG:=mt7988a_bananapi_bpi-r4-emmc/UBOOT_CONFIG:=mt7988a_bpir4_emmc/" "$UBOOT_MAKEFILE"
           
           # --- Шаг 6: Проверяем, что получилось ---
           echo "--- Verifying final Makefile ---"
           grep "PKG_HASH" "$UBOOT_MAKEFILE"
+          grep "UBOOT_CONFIG:=mt7988a_bpir4_emmc" "$UBOOT_MAKEFILE"
           echo "------------------------------"
 
       - name: Run defconfig
