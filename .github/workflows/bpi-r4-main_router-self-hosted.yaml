@@ -121,18 +121,6 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Patch DTS file for 8GB RAM support
-        run: |
-          DTS_FILE="target/linux/mediatek/dts/mt7988a-bananapi-bpi-r4.dts"
-          
-          echo "Patching $DTS_FILE for 8GB RAM..."
-          
-          sed -i 's/0x100000000>; \/\* 4 GiB \*\//0x200000000>; \/\* 8 GiB \*\//' "$DTS_FILE"
-          
-          echo "--- Verifying DTS patch ---"
-          grep "memory" -A 2 "$DTS_FILE"
-          echo "---------------------------"
-
       - name: Add patches for 4GB WED
         run: |
           mkdir -p package/kernel/mt76/patches
@@ -173,6 +161,18 @@ jobs:
       - name: Run defconfig
         run: |
           make defconfig
+
+      - name: Patch DTS file for 8GB RAM support
+        run: |
+          DTS_FILE="target/linux/mediatek/dts/mt7988a-bananapi-bpi-r4.dts"
+          
+          echo "Patching $DTS_FILE for 8GB RAM..."
+          
+          sed -i 's/0x100000000>; \/\* 4 GiB \*\//0x200000000>; \/\* 8 GiB \*\//' "$DTS_FILE"
+          
+          echo "--- Verifying DTS patch ---"
+          grep "memory" -A 2 "$DTS_FILE"
+          echo "---------------------------"
 
       - name: Remove packages that are marked as modules
         run: |
