@@ -134,50 +134,53 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
+      - name: Run defconfig
+        run: |
+          make defconfig
+
       - name: Download all sources and build host tools
         run: |
-          make -j $(nproc) defconfig download
+          make download -j$(nproc)
 
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
-          echo "Ensuring the 'dl' directory exists..."
-          mkdir -p dl
-          
           echo "Cloning frank-w/u-boot repository, branch 2025-10-bpi..."
           git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
           
-          echo "Creating source archive with custom content..."
-          (cd custom-u-boot-source && tar -cjf ../dl/u-boot-2025.10.tar.bz2 .)
+          echo "Overwriting the source archive with custom content..."
+          (cd custom-u-boot-source && tar -cjf ./dl/u-boot-2025.10.tar.bz2 .)
           
           echo "Calculating SHA256 hash of the new archive..."
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
-          echo "New hash is: $CUSTOM_HASH"
           
-          echo "Updating the original U-Boot Makefile..."
           UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
-          
           if [ ! -f "$UBOOT_MAKEFILE" ]; then
             echo "::error::Makefile not found at path: $UBOOT_MAKEFILE"
             exit 1
           fi
           
+          echo "Updating the original U-Boot Makefile with new hash and config..."
           sed -i "s/PKG_HASH:=.*/PKG_HASH:=${CUSTOM_HASH}/" "$UBOOT_MAKEFILE"
-          
           sed -i "s/UBOOT_CONFIG:=mt7988a_bananapi_bpi-r4-emmc/UBOOT_CONFIG:=mt7988a_bpir4_emmc/" "$UBOOT_MAKEFILE"
           
           echo "--- Verifying final Makefile ---"
           grep "PKG_HASH" "$UBOOT_MAKEFILE"
           grep "UBOOT_CONFIG:=mt7988a_bpir4_emmc" "$UBOOT_MAKEFILE"
-          echo "------------------------------"
-          make defconfig
 
-      - name: Test ONLY the U-Boot package compilation (Correct Method)
+      - name: Test ONLY the U-Boot package compilation
         run: |
+          echo "--- Preparing host tools required for the build... ---"
+          make tools/install -j$(nproc) V=s
+
           echo "--- Compiling U-Boot package... ---"
           make package/uboot-mediatek/compile V=s
 
+      - name: Re-run defconfig after modifications
+        run: |
+          make defconfig
+
       - name: Build the firmware image
-        run: make -j $(nproc) world
+        run: make -j$(nproc)
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
