@@ -121,19 +121,17 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Select 8GB board profile via direct .config manipulation
+      - name: Select 8GB board profile
         run: |
           make defconfig
 
-          echo "--- Modifying .config to select 8GB profile ---"
+          echo "--- Modifying .config to force 8GB profile ---"
 
-          sed -i 's/^\(CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4\)=y/\1=n/' .config
+          sed -i '/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y/d' .config
           
-          sed -i '/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g/d' .config
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4-8g=y" >> .config
 
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y" >> .config
-
-          echo "Regenerating .config to apply changes..."
+          echo "Regenerating .config to apply the forced profile..."
           make defconfig
 
           echo "--- Verifying final .config ---"
