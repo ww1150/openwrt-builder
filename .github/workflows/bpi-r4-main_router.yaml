@@ -121,6 +121,21 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
+      - name: Force selection of 8GB board profile
+        run: |
+          make defconfig
+
+          echo "Forcing selection of 8GB board profile..."
+          ./scripts/config/conf --set-bool CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4 n
+          ./scripts/config/conf --set-bool CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g y
+
+          echo "Regenerating .config to apply changes..."
+          make defconfig
+
+          echo "--- Verifying .config after changes ---"
+          grep "bpi-r4" .config
+          echo "-------------------------------------"
+
       - name: Add patches for 4GB WED
         run: |
           mkdir -p package/kernel/mt76/patches
@@ -157,16 +172,6 @@ jobs:
       - name: Add librespeed-go
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
-
-      - name: Select 8GB board variant in .config
-        run: |
-          sed -i 's/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=y/# CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=y is not set/' .config
-
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y" >> .config
-          
-          echo "--- .config after selecting 8GB variant ---"
-          grep "bpi-r4" .config
-          echo "----------------------------------------"
 
       - name: Run defconfig
         run: |
