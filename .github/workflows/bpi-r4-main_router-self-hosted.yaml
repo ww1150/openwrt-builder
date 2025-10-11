@@ -137,8 +137,8 @@ jobs:
           mkdir -p dl
           
           # --- Шаг 2: Клонируем нужный репозиторий и ветку ---
-          echo "Cloning frank-w/u-boot repository, branch 2025-04-bpi..."
-          git clone --depth=1 --branch 2025-04-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
+          echo "Cloning frank-w/u-boot repository, branch 2025-10-bpi..."
+          git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
           
           # --- Шаг 3: Создаем архив с тем именем, которое ожидает система ---
           echo "Creating source archive with custom content..."
