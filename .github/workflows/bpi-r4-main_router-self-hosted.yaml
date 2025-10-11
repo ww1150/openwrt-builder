@@ -121,22 +121,15 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Select 8GB board profile
+      - name: Configure OpenWrt to use DTB from bootloader
         run: |
-          make defconfig
-
-          echo "--- Modifying .config to force 8GB profile ---"
-
-          sed -i '/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y/d' .config
+          echo "Disabling built-in DTB and trusting the bootloader's DTB..."
           
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4-8g=y" >> .config
-
-          echo "Regenerating .config to apply the forced profile..."
-          make defconfig
-
-          echo "--- Verifying final .config ---"
-          grep "bpi-r4" .config
-          echo "-------------------------------"
+          sed -i 's/CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB=y/# CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB is not set/' .config
+          
+          echo "--- Verifying .config for DTB handling ---"
+          grep "APPEND_DTB" .config || echo "CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB is confirmed disabled."
+          echo "------------------------------------------"
 
       - name: Add patches for 4GB WED
         run: |
