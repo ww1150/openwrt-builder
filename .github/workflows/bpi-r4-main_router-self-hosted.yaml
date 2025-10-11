@@ -184,6 +184,9 @@ jobs:
           echo "--- Cleaning up previous U-Boot build attempt... ---"
           make package/uboot-mediatek/clean V=s
           
+          echo "--- Preparing build environment and host tools... ---"
+          make download
+          
           # --- Шаг 2: Запускаем компиляцию только пакета U-Boot ---
           # Используем правильный путь.
           echo "--- Starting compilation of the U-Boot package... ---"
