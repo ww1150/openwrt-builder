@@ -121,15 +121,17 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Configure OpenWrt to use DTB from bootloader
+      - name: Patch DTS file for 8GB RAM support
         run: |
-          echo "Disabling built-in DTB and trusting the bootloader's DTB..."
+          DTS_FILE="target/linux/mediatek/dts/mt7988a-bananapi-bpi-r4.dts"
           
-          sed -i 's/CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB=y/# CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB is not set/' .config
+          echo "Patching $DTS_FILE for 8GB RAM..."
           
-          echo "--- Verifying .config for DTB handling ---"
-          grep "APPEND_DTB" .config || echo "CONFIG_TARGET_MEDIATEK_FIT_APPEND_DTB is confirmed disabled."
-          echo "------------------------------------------"
+          sed -i 's/0x100000000>; \/\* 4 GiB \*\//0x200000000>; \/\* 8 GiB \*\//' "$DTS_FILE"
+          
+          echo "--- Verifying DTS patch ---"
+          grep "memory" -A 2 "$DTS_FILE"
+          echo "---------------------------"
 
       - name: Add patches for 4GB WED
         run: |
