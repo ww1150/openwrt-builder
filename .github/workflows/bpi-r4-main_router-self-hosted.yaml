@@ -134,23 +134,35 @@ jobs:
         run: |
           make defconfig
 
-      - name: Patch DTS file for 8GB RAM support (correct path)
+      - name: Create and place DTS patch for 8GB RAM support
         run: |
-          DTS_FILE=$(find target/linux/mediatek/files-*/arch/arm64/boot/dts/mediatek/ -name "mt7988a-bananapi-bpi-r4.dts")
+          PATCH_DIR=$(find target/linux/mediatek -type d -name "patches-*")
           
-          if [ -z "$DTS_FILE" ]; then
-            echo "::error::DTS file for BPI-R4 not found even after a clean checkout!"
+          if [ -z "$PATCH_DIR" ]; then
+            echo "::error::Kernel patch directory not found!"
             exit 1
           fi
-
-          echo "Found DTS file at: $DTS_FILE"
-          echo "Patching for 8GB RAM..."
           
-          sed -i 's/0x100000000>; \/\* 4 GiB \*\//0x200000000>; \/\* 8 GiB \*\//' "$DTS_FILE"
+          echo "Found kernel patch directory at: $PATCH_DIR"
           
-          echo "--- Verifying DTS patch ---"
-          grep "memory" -A 2 "$DTS_FILE"
-          echo "---------------------------"
+          cat << 'EOF' > "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
+          --- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
+          +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
+          @@ -222,7 +222,7 @@
+           
+              memory@40000000 {
+                  device_type = "memory";
+          -		reg = <0x0 0x40000000 0x0 0x100000000>; /* 4 GiB */
+          +		reg = <0x0 0x40000000 0x0 0x200000000>; /* 8 GiB */
+              };
+           
+              reserved-memory {
+          EOF
+  
+          echo "--- Verifying patch creation ---"
+          ls -l "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
+          cat "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
+          echo "--------------------------------"
 
       - name: Remove packages that are marked as modules
         run: |
