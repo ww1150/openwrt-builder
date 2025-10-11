@@ -61,28 +61,6 @@ jobs:
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-      - name: Override U-Boot source to frank-w repository
-        run: |
-          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
-
-          echo "Overriding U-Boot source in $UBOOT_MAKEFILE"
-
-          # Указываем, что источник - это git-репозиторий
-          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
-          
-          # Меняем URL на репозиторий frank-w
-          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
-          
-          # Указываем нужную ветку (bpi-r4 содержит все последние исправления)
-          sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=bpi-r4/' $UBOOT_MAKEFILE
-          
-          # !!! Важно: Удаляем проверку хеша, так как мы качаем из git, а не архив
-          sed -i '/PKG_MIRROR_HASH/d' $UBOOT_MAKEFILE
-          
-          echo "--- Patched uboot-mediatek Makefile ---"
-          cat $UBOOT_MAKEFILE
-          echo "-------------------------------------"
-
       - name: Update and install feeds (with fallback to GitHub mirrors)
         run: |
           if ./scripts/feeds update -a; then
@@ -105,12 +83,6 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
-
-      - name: Add packages for rootfs expansion
-        run: |
-          echo "CONFIG_PACKAGE_cloud-utils-growpart=y" >> .config
-          echo "CONFIG_PACKAGE_util-linux-fdisk=y" >> .config
-          echo "CONFIG_PACKAGE_e2fsprogs=y" >> .config
 
       - name: Enable MLO
         run: |
@@ -183,6 +155,24 @@ jobs:
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
+
+      - name: Override U-Boot source to frank-w repository
+        run: |
+          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
+
+          echo "Overriding U-Boot source in $UBOOT_MAKEFILE"
+
+          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
+          
+          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
+          
+          sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=bpi-r4/' $UBOOT_MAKEFILE
+          
+          sed -i '/PKG_MIRROR_HASH/d' $UBOOT_MAKEFILE
+          
+          echo "--- Patched uboot-mediatek Makefile ---"
+          cat $UBOOT_MAKEFILE
+          echo "-------------------------------------"
 
       - name: Build the firmware image
         run: make -j $(nproc) defconfig download world
