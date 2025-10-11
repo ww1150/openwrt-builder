@@ -163,42 +163,12 @@ jobs:
         run: |
           make defconfig
 
-      - name: Create and place DTS patch for 8GB RAM support
-        run: |
-          PATCH_DIR=$(find target/linux/mediatek -type d -name "patches-*")
-          
-          if [ -z "$PATCH_DIR" ]; then
-            echo "::error::Kernel patch directory not found!"
-            exit 1
-          fi
-          
-          echo "Found kernel patch directory at: $PATCH_DIR"
-          
-          cat << 'EOF' > "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
-          --- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
-          +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
-          @@ -222,7 +222,7 @@
-           
-              memory@40000000 {
-                  device_type = "memory";
-          -		reg = <0x0 0x40000000 0x0 0x100000000>; /* 4 GiB */
-          +		reg = <0x0 0x40000000 0x0 0x200000000>; /* 8 GiB */
-              };
-           
-              reserved-memory {
-          EOF
-  
-          echo "--- Verifying patch creation ---"
-          ls -l "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
-          cat "${PATCH_DIR}/999-bpi-r4-8gb-ram-support.patch"
-          echo "--------------------------------"
-
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
       - name: Build the firmware image
-        run: make -j$(nproc) V=s
+        run: make -j $(nproc) defconfig download world
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
