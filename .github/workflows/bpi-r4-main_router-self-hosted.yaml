@@ -132,27 +132,29 @@ jobs:
 
       - name: Prepare custom U-Boot source for the original package
         run: |
-          # --- Шаг 1: Клонируем нужный репозиторий и ветку ---
+          # --- Шаг 1: Создаем директорию для загрузок, если ее нет ---
+          echo "Ensuring the 'dl' directory exists..."
+          mkdir -p dl
+          
+          # --- Шаг 2: Клонируем нужный репозиторий и ветку ---
           echo "Cloning frank-w/u-boot repository, branch 2025-04-bpi..."
           git clone --depth=1 --branch 2025-04-bpi https://github.com/frank-w/u-boot.git custom-u-boot-source
           
-          # --- Шаг 2: Создаем архив с тем именем, которое ожидает система ---
-          # Имя файла (u-boot-2025.10.tar.bz2) взято из оригинального Makefile.
+          # --- Шаг 3: Создаем архив с тем именем, которое ожидает система ---
           echo "Creating source archive with custom content..."
           (cd custom-u-boot-source && tar -cjf ../dl/u-boot-2025.10.tar.bz2 .)
           
-          # --- Шаг 3: Вычисляем хеш-сумму нашего нового архива ---
-          echo "Calculating SHA256 hash of the new archive..."
+          # --- Шаг 4: Вычисляем хеш-сумму нашего нового архива ---
+          echo "Calculating SHA265 hash of the new archive..."
           CUSTOM_HASH=$(sha256sum dl/u-boot-2025.10.tar.bz2 | awk '{print $1}')
           echo "New hash is: $CUSTOM_HASH"
           
-          # --- Шаг 4: Обновляем ОРИГИНАЛЬНЫЙ Makefile, чтобы он использовал наш хеш ---
-          # Теперь система найдет локальный файл, проверит его по нашему хешу и будет довольна.
+          # --- Шаг 5: Обновляем ОРИГИНАЛЬНЫЙ Makefile, чтобы он использовал наш хеш ---
           echo "Updating the original U-Boot Makefile with the new hash..."
           UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
           sed -i "s/PKG_HASH:=.*/PKG_HASH:=${CUSTOM_HASH}/" "$UBOOT_MAKEFILE"
           
-          # --- Шаг 5: Проверяем, что получилось ---
+          # --- Шаг 6: Проверяем, что получилось ---
           echo "--- Verifying final Makefile ---"
           grep "PKG_HASH" "$UBOOT_MAKEFILE"
           echo "------------------------------"
