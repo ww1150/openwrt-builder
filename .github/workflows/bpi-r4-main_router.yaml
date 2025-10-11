@@ -121,20 +121,25 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Force selection of 8GB board profile
+      - name: Select 8GB board profile using config fragment
         run: |
-          make defconfig
+          cat <<'EOF' > 8g_profile.config
+          CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=n
+          CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y
+          EOF
 
-          echo "Forcing selection of 8GB board profile..."
-          ./scripts/config/conf --set-bool CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4 n
-          ./scripts/config/conf --set-bool CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g y
+          echo "--- Created config fragment ---"
+          cat 8g_profile.config
+          echo "-------------------------------"
+
+          ./scripts/merge_config.sh -m .config 8g_profile.config
 
           echo "Regenerating .config to apply changes..."
           make defconfig
 
-          echo "--- Verifying .config after changes ---"
+          echo "--- Verifying final .config ---"
           grep "bpi-r4" .config
-          echo "-------------------------------------"
+          echo "-------------------------------"
 
       - name: Add patches for 4GB WED
         run: |
