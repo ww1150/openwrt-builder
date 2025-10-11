@@ -121,18 +121,17 @@ jobs:
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
 
-      - name: Select 8GB board profile using config fragment
+      - name: Select 8GB board profile via direct .config manipulation
         run: |
-          cat <<'EOF' > 8g_profile.config
-          CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4=n
-          CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y
-          EOF
+          make defconfig
 
-          echo "--- Created config fragment ---"
-          cat 8g_profile.config
-          echo "-------------------------------"
+          echo "--- Modifying .config to select 8GB profile ---"
 
-          ./scripts/merge_config.sh -m .config 8g_profile.config
+          sed -i 's/^\(CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4\)=y/\1=n/' .config
+          
+          sed -i '/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g/d' .config
+
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y" >> .config
 
           echo "Regenerating .config to apply changes..."
           make defconfig
