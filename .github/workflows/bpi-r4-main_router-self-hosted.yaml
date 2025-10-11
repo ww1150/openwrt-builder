@@ -146,18 +146,15 @@ jobs:
           key: ${{ runner.os }}-build-env-${{ hashFiles('tools/Makefile', 'toolchain/Makefile', '.config') }}
           # Пути, которые мы кэшируем:
           path: |
-            staging_dir/host
-            staging_dir/toolchain-*
+            staging_dir
             build_dir/host
-            build_dir/toolchain-*
             tools
             toolchain
 
       - name: Build environment (tools and toolchain)
         if: steps.cache-env.outputs.cache-hit != 'true'
         run: |
-          make tools/install -j$(nproc)
-          make toolchain/install -j$(nproc)
+          make prereq -j$(nproc)
 
       - name: Prepare custom U-Boot source and fix build configuration
         run: |
