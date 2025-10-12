@@ -139,18 +139,14 @@ jobs:
           make defconfig
 
       - name: Restore build environment cache
-        id: cache-env-restore
+        id: cache-env-restore # Правильный ID
         uses: actions/cache/restore@v4
         with:
-          key: ${{ runner.os }}-build-env-${{ hashFiles('tools/Makefile', 'toolchain/Makefile', '.config') }}
-          path: |
-            staging_dir
-            build_dir/host
-            tools
-            toolchain
+          key: ${{ runner.os }}-build-env-v2-${{ hashFiles('tools/Makefile', 'toolchain/Makefile', '.config') }}
+          path: staging_dir
 
       - name: Build environment (tools and toolchain)
-        if: steps.cache-env.outputs.cache-hit != 'true'
+        if: steps.cache-env-restore.outputs.cache-hit != 'true'
         run: |
           make download -j$(nproc)
           make tools/install -j$(nproc)
@@ -160,12 +156,8 @@ jobs:
         if: steps.cache-env-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          key: ${{ steps.cache-env-restore.outputs.cache-primary-key || format('{0}-{1}', runner.os, 'build-env-') }}
-          path: |
-            staging_dir
-            build_dir/host
-            tools
-            toolchain
+          key: ${{ steps.cache-env-restore.outputs.cache-primary-key }}
+          path: staging_dir
 
       - name: Build the firmware image
         run: make world -j$(nproc)
