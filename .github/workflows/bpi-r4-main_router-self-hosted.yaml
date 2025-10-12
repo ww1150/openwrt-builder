@@ -168,6 +168,42 @@ jobs:
       - name: Build the firmware image
         run: make -j$(nproc)
 
+      - name: Integrate Pre-compiled U-Boot from frank-w
+        run: |
+          echo "Cloning frank-w's U-Boot repository to get binaries and script..."
+          git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git uboot_repo
+          
+          echo "Finding the generated OpenWrt image..."
+          GZ_IMAGE_FILE=$(find bin/targets/mediatek/filogic -name "*emmc.img.gz")
+          if [ -z "$GZ_IMAGE_FILE" ]; then
+            echo "::error::Packed EMMC image file (*emmc.img.gz) not found!"
+            exit 1
+          fi
+          gunzip -f "$GZ_IMAGE_FILE"
+          IMAGE_FILE="${GZ_IMAGE_FILE%.gz}" # Убираем .gz из имени файла
+          
+          echo "Finding the pre-compiled U-Boot binary and injection script..."
+
+          UBOOT_BIN="uboot_repo/fip/BPI-R4/u-boot.bin"
+          SCRIPT="uboot_repo/tools/mt7988-emmc-prep.sh"
+          
+          if [ ! -f "$UBOOT_BIN" ]; then
+            echo "::error::Pre-compiled U-Boot binary not found at $UBOOT_BIN"
+            exit 1
+          fi
+          if [ ! -f "$SCRIPT" ]; then
+            echo "::error::Injection script not found at $SCRIPT"
+            exit 1
+          fi
+          
+          echo "Running the injection script to integrate U-Boot..."
+
+          bash "$SCRIPT" "$UBOOT_BIN" "$IMAGE_FILE"
+          
+          echo "U-Boot integration complete. Repacking the image..."
+
+          gzip -f "$IMAGE_FILE"
+
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
 
