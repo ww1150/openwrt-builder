@@ -145,12 +145,12 @@ jobs:
           key: ${{ runner.os }}-build-env-v2-${{ hashFiles('tools/Makefile', 'toolchain/Makefile', '.config') }}
           path: staging_dir
 
-      - name: Build environment (tools and toolchain)
+      - name: Build environment
         if: steps.cache-env-restore.outputs.cache-hit != 'true'
         run: |
-          make download -j$(nproc)
-          make tools/install -j$(nproc)
-          make toolchain/install -j$(nproc)
+          make -j$(nproc) download
+          make -j$(nproc) tools/install
+          make -j$(nproc) toolchain/install
 
       - name: Save build environment cache
         if: steps.cache-env-restore.outputs.cache-hit != 'true'
@@ -160,7 +160,7 @@ jobs:
           path: staging_dir
 
       - name: Build the firmware image
-        run: make world -j$(nproc)
+        run: make -j $(nproc) world
 
       - name: Integrate Pre-compiled U-Boot from frank-w
         run: |
