@@ -160,7 +160,7 @@ jobs:
           path: staging_dir
 
       - name: Build the firmware image
-        run: make -j $(nproc) world
+        run: make -j $(nproc) download world
 
       - name: Integrate Pre-compiled U-Boot from frank-w
         run: |
