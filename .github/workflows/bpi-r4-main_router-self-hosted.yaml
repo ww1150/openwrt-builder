@@ -152,7 +152,8 @@ jobs:
       - name: Build environment (tools and toolchain)
         if: steps.cache-env.outputs.cache-hit != 'true'
         run: |
-          make prereq -j$(nproc)
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
 
       - name: Save build environment cache
         if: steps.cache-env-restore.outputs.cache-hit != 'true'
