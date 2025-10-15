@@ -77,6 +77,19 @@ jobs:
           echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
+      - name: Fix broken 'zapret' package dependency
+        run: |
+          echo "Patching 'zapret' Makefile to add missing libudns dependency..."
+          # Находим Makefile пакета zapret и добавляем в конец строки DEPENDS:= недостающую библиотеку +libudns
+          ZAPRET_MAKEFILE="feeds/zapret/zapret/Makefile"
+          if [ -f "$ZAPRET_MAKEFILE" ]; then
+            sed -i '/DEPENDS:=/s/$/ +libudns/' "$ZAPRET_MAKEFILE"
+            echo "Successfully patched 'zapret' Makefile. New dependencies:"
+            grep "DEPENDS:=" "$ZAPRET_MAKEFILE"
+          else
+            echo "::warning::Could not find zapret Makefile to patch."
+          fi
+
       - name: Configure firmware image
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/mediatek/mt7988a/bpi-r4 > .config
