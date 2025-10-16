@@ -77,18 +77,6 @@ jobs:
           echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
-      - name: Fix broken 'zapret' package dependency
-        run: |
-          echo "Patching 'zapret' Makefile to add missing libudns dependency..."
-          # Находим Makefile пакета zapret и добавляем в конец строки DEPENDS:= недостающую библиотеку +libudns
-          ZAPRET_MAKEFILE="feeds/zapret/zapret/Makefile"
-          if [ -f "$ZAPRET_MAKEFILE" ]; then
-            sed -i '/DEPENDS:=/s/$/ +libudns/' "$ZAPRET_MAKEFILE"
-            echo "Successfully patched 'zapret' Makefile. New dependencies:"
-            grep "DEPENDS:=" "$ZAPRET_MAKEFILE"
-          else
-            echo "::warning::Could not find zapret Makefile to patch."
-          fi
 
       - name: Configure firmware image
         run: |
@@ -169,7 +157,7 @@ jobs:
         run: |
           make defconfig
           make download -j$(nproc)
-          make world -j$(nproc) V=s
+          make world -j$(nproc)
 
       - name: Integrate Pre-compiled U-Boot from frank-w
         run: |
