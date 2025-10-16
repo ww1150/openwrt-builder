@@ -101,15 +101,14 @@ jobs:
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
 
-      - name: Switch to OpenSSL and completely disable mbedtls
+      - name: Perform a clean switch to OpenSSL
         run: |
-          echo "Switching crypto backend to OpenSSL..."
-          sed -i '/CONFIG_PACKAGE_wpad-mbedtls/d' .config
+          echo "Performing a clean switch to OpenSSL as the default crypto library..."
 
-          sed -i '/CONFIG_PACKAGE_libmbedtls/d' .config
-          echo "# CONFIG_PACKAGE_libmbedtls is not set" >> .config
+          grep -v 'CONFIG_PACKAGE_wpad-\|CONFIG_PACKAGE_libmbedtls\|CONFIG_PACKAGE_libwolfssl' .config > .config.tmp && mv .config.tmp .config
 
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
+          echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
+          echo "CONFIG_PACKAGE_libopenssl=y" >> .config
 
       #      - name: Add patches for 4GB WED
       #        run: |
