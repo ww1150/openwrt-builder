@@ -149,18 +149,13 @@ CONFIG_PACKAGE_luci-theme-argon=y
 
 # Quectel EM12-G
 # wwan libqmi kmod-usb-net kmod-usb-serial kmod-usb-serial-wwan kmod-usb-serial-option kmod-usb-serial-qualcomm luci-proto-qmi uqmi kmod-usb-wdm kmod-usb-net-qmi-wwan libmbim
-CONFIG_PACKAGE_wwan=y
-CONFIG_PACKAGE_libqmi=y
 CONFIG_PACKAGE_kmod-usb-net=y
 CONFIG_PACKAGE_kmod-usb-serial=y
 CONFIG_PACKAGE_kmod-usb-serial-wwan=y
-CONFIG_PACKAGE_kmod-usb-serial-option=y
-CONFIG_PACKAGE_kmod-usb-serial-qualcomm=y
-CONFIG_PACKAGE_luci-proto-qmi=y
-CONFIG_PACKAGE_uqmi=y
 CONFIG_PACKAGE_kmod-usb-wdm=y
 CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
-CONFIG_PACKAGE_libmbim=y
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+CONFIG_PACKAGE_kmod-usb-serial-qualcomm=y
 
 CONFIG_ALL_KMODS=y
 CONFIG_ALL_NONSHARED=y
