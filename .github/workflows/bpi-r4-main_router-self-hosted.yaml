@@ -192,29 +192,26 @@ jobs:
           BUILD_ROOT=$(pwd)
           echo "Build root is: ${BUILD_ROOT}"
 
-          echo "Step 1: Preparing kernel sources (applies existing patches)..."
+          echo "Step 1: Preparing kernel sources..."
           make target/linux/prepare -j$(nproc) V=s
 
           KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
-          echo "Kernel build directory is: $KBUILD_DIR"
-
-          echo "Step 2: Entering kernel build directory..."
           cd "$KBUILD_DIR"
 
-          echo "Step 3: Creating a new patch for 8GB RAM..."
-
+          echo "Step 2: Creating a new patch for 8GB RAM..."
+          # Мы убрали 'quilt setup' и 'push'
           quilt new 999-bpi-r4-add-8gb-ram-support.patch
           DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
           quilt add "$DTSI_FILE"
 
-          echo "Step 4: Modifying the DTSi file..."
+          echo "Step 3: Modifying the DTSi file..."
           sed -i '/memory@40000000 {/,/};/c\
           memory@40000000 {\
               device_type = "memory";\
-              reg = <0x0 0x40000-0000 0x2 0x00000000>;\
+              reg = <0x0 0x40000000 0x2 0x00000000>;\
           };' "$DTSI_FILE"
 
-          echo "Step 5: Finalizing the patch..."
+          echo "Step 4: Finalizing the patch..."
           quilt refresh
           
           echo "Patch created successfully. Going back to root..."
