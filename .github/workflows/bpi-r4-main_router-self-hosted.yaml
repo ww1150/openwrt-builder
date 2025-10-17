@@ -149,6 +149,28 @@ jobs:
         run: |
           make defconfig
 
+      - name: Replace U-Boot and ATF sources with frank-w versions
+        run: |
+          echo "Replacing bootloader sources..."
+          # Путь к Makefile для U-Boot в OpenWrt
+          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
+          # Путь к Makefile для ARM Trusted Firmware (BL31)
+          ATF_MAKEFILE="package/boot/arm-trusted-firmware-mediatek/Makefile"
+
+          # Заменяем URL репозитория и ветку/коммит для U-Boot
+          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
+          sed -i 's|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=2025-10-bpi|' $UBOOT_MAKEFILE # Используем имя ветки
+          sed -i '/PKG_SOURCE_PROTO/d' $UBOOT_MAKEFILE # Удаляем старый протокол, если он был branch/tag
+          sed -i '/PKG_REV/d' $UBOOT_MAKEFILE # Удаляем старый коммит, если он был
+
+          # Frank-w также модифицирует ATF (BL31), что критически важно для EMMC
+          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/arm-trusted-firmware.git|' $ATF_MAKEFILE
+          sed -i 's|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=bpi-r4|' $ATF_MAKEFILE # У него отдельная ветка для BPI-R4
+          sed -i '/PKG_SOURCE_PROTO/d' $ATF_MAKEFILE
+          sed -i '/PKG_REV/d' $ATF_MAKEFILE
+
+          echo "Bootloader sources have been replaced."
+
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
@@ -158,42 +180,6 @@ jobs:
           make defconfig
           make download -j$(nproc)
           make world -j$(nproc)
-
-      - name: Integrate Pre-compiled U-Boot from frank-w
-        run: |
-          echo "Cloning frank-w's U-Boot repository to get binaries and script..."
-          git clone --depth=1 --branch 2025-10-bpi https://github.com/frank-w/u-boot.git uboot_repo
-          
-          echo "Finding the generated OpenWrt image..."
-          GZ_IMAGE_FILE=$(find bin/targets/mediatek/filogic -name "*emmc.img.gz")
-          if [ -z "$GZ_IMAGE_FILE" ]; then
-            echo "::error::Packed EMMC image file (*emmc.img.gz) not found!"
-            exit 1
-          fi
-          gunzip -f "$GZ_IMAGE_FILE"
-          IMAGE_FILE="${GZ_IMAGE_FILE%.gz}" # Убираем .gz из имени файла
-          
-          echo "Finding the pre-compiled U-Boot binary and injection script..."
-
-          UBOOT_BIN="uboot_repo/fip/BPI-R4/u-boot.bin"
-          SCRIPT="uboot_repo/tools/mt7988-emmc-prep.sh"
-          
-          if [ ! -f "$UBOOT_BIN" ]; then
-            echo "::error::Pre-compiled U-Boot binary not found at $UBOOT_BIN"
-            exit 1
-          fi
-          if [ ! -f "$SCRIPT" ]; then
-            echo "::error::Injection script not found at $SCRIPT"
-            exit 1
-          fi
-          
-          echo "Running the injection script to integrate U-Boot..."
-
-          bash "$SCRIPT" "$UBOOT_BIN" "$IMAGE_FILE"
-          
-          echo "U-Boot integration complete. Repacking the image..."
-
-          gzip -f "$IMAGE_FILE"
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
