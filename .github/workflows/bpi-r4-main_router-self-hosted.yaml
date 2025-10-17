@@ -189,7 +189,7 @@ jobs:
 
       - name: Create 8GB RAM patch using Quilt
         run: |
-          make download -j$(nproc)
+          make defconfig download -j$(nproc)
           echo "Step 1: Preparing kernel sources..."
           make target/linux/prepare -j$(nproc) V=s
 
