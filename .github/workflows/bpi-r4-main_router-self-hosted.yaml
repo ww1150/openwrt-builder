@@ -149,46 +149,60 @@ jobs:
         run: |
           make defconfig
 
-      - name: Replace U-Boot and ATF sources with frank-w versions
-        run: |
-          echo "Replacing bootloader sources..."
-          
-          # Путь к Makefile для U-Boot
-          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
-          # Путь к Makefile для ARM Trusted Firmware (BL31)
-          ATF_MAKEFILE="package/boot/arm-trusted-firmware-mediatek/Makefile"
-
-          # --- Настраиваем U-Boot ---
-          # 1. Получаем хеш последнего коммита в нужной ветке
-          UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | cut -f 1)
-          echo "Using U-Boot commit: $UBOOT_COMMIT_HASH"
-          
-          # 2. Меняем URL, версию (теперь это хеш коммита) и убираем проверку хеша архива
-          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
-          sed -i "s|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH|" $UBOOT_MAKEFILE
-          sed -i 's|PKG_HASH:=.*|PKG_HASH:=skip|' $UBOOT_MAKEFILE
-
-          # --- Настраиваем ARM Trusted Firmware (ATF) ---
-          # 1. Получаем хеш последнего коммита в нужной ветке
-          ATF_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/arm-trusted-firmware.git bpi-r4 | cut -f 1)
-          echo "Using ATF commit: $ATF_COMMIT_HASH"
-          
-          # 2. Меняем URL, версию (хеш коммита) и убираем проверку хеша архива
-          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/arm-trusted-firmware.git|' $ATF_MAKEFILE
-          sed -i "s|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=$ATF_COMMIT_HASH|" $ATF_MAKEFILE
-          sed -i 's|PKG_HASH:=.*|PKG_HASH:=skip|' $ATF_MAKEFILE
-
-          echo "Bootloader sources have been successfully replaced."
-
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Build the firmware image (Robust sequence)
+      - name: Build the firmware image
         run: |
           make defconfig
-          make download -j$(nproc)
-          make world -j$(nproc)
+          # 1. Запускаем download и ИГНОРИРУЕМ его ошибку.
+          # Он нужен только для того, чтобы создать пустые файлы-заглушки.
+          make download -j$(nproc) || true
+
+          # 2. Переходим в папку с загрузками и удаляем некорректные файлы
+          cd dl
+          rm -f u-boot-*.tar.bz2 trusted-firmware-a-*.tar.gz
+
+          # 3. Скачиваем правильные архивы с исходниками от Frank-w
+          echo "Downloading correct U-Boot source..."
+          wget -O u-boot-frankw.tar.gz https://github.com/frank-w/u-boot/archive/refs/heads/2025-10-bpi.tar.gz
+
+          echo "Downloading correct ATF source..."
+          wget -O atf-frankw.tar.gz https://github.com/frank-w/arm-trusted-firmware/archive/refs/heads/bpi-r4.tar.gz
+
+          # 4. НАХОДИМ ИМЕНА, которые ожидает система сборки, и переименовываем наши файлы
+          # Система сборки OpenWrt создает файлы с уникальными именами версий, например u-boot-2025.10.tar.bz2
+          # Мы должны найти это имя и подменить файл.
+          
+          # Для U-Boot (он ожидает .tar.bz2, но распакует и .tar.gz)
+          UBOOT_TARGET_NAME=$(find . -name "u-boot-*.tar.bz2.stamped" | sed 's|.stamped||' | xargs basename)
+          if [ -n "$UBOOT_TARGET_NAME" ]; then
+              echo "Found target U-Boot name: $UBOOT_TARGET_NAME. Replacing..."
+              mv u-boot-frankw.tar.gz "$UBOOT_TARGET_NAME"
+          else
+              # Если stamped-файла нет, используем стандартное имя из конфига
+              echo "Target U-Boot name not found, using default. Replacing..."
+              mv u-boot-frankw.tar.gz u-boot-2025.10.tar.bz2
+          fi
+
+          # Для ATF (он ожидает .tar.gz)
+          ATF_TARGET_NAME=$(find . -name "trusted-firmware-a-*.tar.gz.stamped" | sed 's|.stamped||' | xargs basename)
+          if [ -n "$ATF_TARGET_NAME" ]; then
+              echo "Found target ATF name: $ATF_TARGET_NAME. Replacing..."
+              mv atf-frankw.tar.gz "$ATF_TARGET_NAME"
+          else
+               # Если stamped-файла нет, используем стандартное имя из конфига
+              echo "Target ATF name not found, using default. Replacing..."
+              mv atf-frankw.tar.gz trusted-firmware-a-v2.10.tar.gz # Имя может отличаться, это пример
+          fi
+          
+          echo "Source archives have been replaced. Listing dl/ directory:"
+          ls -la
+          
+          # 5. Возвращаемся и запускаем основную сборку.
+          cd ..
+          make world -j$(nproc) V=s
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
