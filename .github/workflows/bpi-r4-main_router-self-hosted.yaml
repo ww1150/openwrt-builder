@@ -189,20 +189,25 @@ jobs:
 
       - name: Create 8GB RAM patch using Quilt
         run: |
+          # Определяем абсолютный путь к корню сборки
+          BUILD_ROOT=$(pwd)
+          echo "Build root is: ${BUILD_ROOT}"
+
           echo "Step 1: Preparing kernel sources..."
           make target/linux/prepare -j$(nproc) V=s
 
-          echo "Step 2: Entering kernel build directory..."
+          # Находим директорию сборки ядра
           KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
+
+          echo "Step 2: Entering kernel build directory ($KBUILD_DIR)..."
           cd "$KBUILD_DIR"
 
-          echo "Step 3: Initializing Quilt..."
-          # ИСПРАВЛЕНИЕ: Добавляем команду quilt setup
-          # Она найдет Makefile ядра и создаст файл 'series' со списком всех стандартных патчей.
-          quilt setup ../../target/linux/mediatek/Makefile
+          echo "Step 3: Initializing Quilt using an absolute path..."
+          # ИСПОЛЬЗУЕМ АБСОЛЮТНЫЙ ПУТЬ к Makefile, чтобы избежать ошибок
+          quilt setup "${BUILD_ROOT}/target/linux/mediatek/Makefile"
 
           echo "Step 4: Applying existing patches..."
-          # Теперь эта команда найдет 'series' и успешно применит все патчи
+          # Теперь эта команда гарантированно найдет 'series' файл
           quilt push -a
 
           echo "Step 5: Creating a new patch for 8GB RAM..."
@@ -216,12 +221,11 @@ jobs:
               device_type = "memory";\
               reg = <0x0 0x40000000 0x2 0x00000000>;\
           };' "$DTSI_FILE"
-
+            
           echo "Step 7: Finalizing the patch..."
           quilt refresh
-          
+            
           echo "Patch created successfully. Going back to root..."
-          # Выходим из директории сборки ядра, чтобы следующий шаг make сработал
           cd -
 
       - name: Build the firmware image
