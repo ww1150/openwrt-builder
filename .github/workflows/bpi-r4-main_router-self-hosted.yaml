@@ -152,24 +152,33 @@ jobs:
       - name: Replace U-Boot and ATF sources with frank-w versions
         run: |
           echo "Replacing bootloader sources..."
-          # Путь к Makefile для U-Boot в OpenWrt
+          
+          # Путь к Makefile для U-Boot
           UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
           # Путь к Makefile для ARM Trusted Firmware (BL31)
           ATF_MAKEFILE="package/boot/arm-trusted-firmware-mediatek/Makefile"
 
-          # Заменяем URL репозитория и ветку/коммит для U-Boot
+          # --- Настраиваем U-Boot ---
+          # 1. Получаем хеш последнего коммита в нужной ветке
+          UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | cut -f 1)
+          echo "Using U-Boot commit: $UBOOT_COMMIT_HASH"
+          
+          # 2. Меняем URL, версию (теперь это хеш коммита) и убираем проверку хеша архива
           sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
-          sed -i 's|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=2025-10-bpi|' $UBOOT_MAKEFILE # Используем имя ветки
-          sed -i '/PKG_SOURCE_PROTO/d' $UBOOT_MAKEFILE # Удаляем старый протокол, если он был branch/tag
-          sed -i '/PKG_REV/d' $UBOOT_MAKEFILE # Удаляем старый коммит, если он был
+          sed -i "s|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH|" $UBOOT_MAKEFILE
+          sed -i 's|PKG_HASH:=.*|PKG_HASH:=skip|' $UBOOT_MAKEFILE
 
-          # Frank-w также модифицирует ATF (BL31), что критически важно для EMMC
+          # --- Настраиваем ARM Trusted Firmware (ATF) ---
+          # 1. Получаем хеш последнего коммита в нужной ветке
+          ATF_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/arm-trusted-firmware.git bpi-r4 | cut -f 1)
+          echo "Using ATF commit: $ATF_COMMIT_HASH"
+          
+          # 2. Меняем URL, версию (хеш коммита) и убираем проверку хеша архива
           sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/arm-trusted-firmware.git|' $ATF_MAKEFILE
-          sed -i 's|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=bpi-r4|' $ATF_MAKEFILE # У него отдельная ветка для BPI-R4
-          sed -i '/PKG_SOURCE_PROTO/d' $ATF_MAKEFILE
-          sed -i '/PKG_REV/d' $ATF_MAKEFILE
+          sed -i "s|PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=$ATF_COMMIT_HASH|" $ATF_MAKEFILE
+          sed -i 's|PKG_HASH:=.*|PKG_HASH:=skip|' $ATF_MAKEFILE
 
-          echo "Bootloader sources have been replaced."
+          echo "Bootloader sources have been successfully replaced."
 
       - name: Remove packages that are marked as modules
         run: |
