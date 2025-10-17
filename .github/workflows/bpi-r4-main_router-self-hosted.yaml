@@ -77,6 +77,36 @@ jobs:
           echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
+      - name: Create and apply DTS patch for 8GB RAM
+        run: |
+          # Определяем директорию для патчей на основе версии ядра
+          # OpenWrt сам определяет версию, мы просто находим папку
+          PATCH_DIR=$(find target/linux/mediatek/ -type d -name "patches-*" | head -n 1)
+          
+          if [ -z "$PATCH_DIR" ]; then
+            echo "::error::Could not find kernel patch directory!"
+            exit 1
+          fi
+
+          echo "Found kernel patch directory: $PATCH_DIR"
+          
+          # Создаем файл патча с помощью heredoc
+          # Имя 999-....patch гарантирует, что он применится одним из последних
+          cat > "${PATCH_DIR}/999-bpi-r4-add-8gb-ram-support.patch" <<EOF
+          --- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
+          +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
+          @@ -21,7 +21,7 @@
+           
+           	memory@40000000 {
+           		device_type = "memory";
+          -		reg = <0x0 0x40000000 0x1 0xc0000000>;
+          +		reg = <0x0 0x40000000 0x2 0x00000000>;
+           	};
+           
+           	chosen {
+          EOF
+
+          echo "8GB RAM patch created successfully."
 
       - name: Configure firmware image
         run: |
