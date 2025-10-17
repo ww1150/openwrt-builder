@@ -77,37 +77,6 @@ jobs:
           echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
-      - name: Create and apply DTS patch for 8GB RAM
-        run: |
-          # Определяем директорию для патчей на основе версии ядра
-          # OpenWrt сам определяет версию, мы просто находим папку
-          PATCH_DIR=$(find target/linux/mediatek/ -type d -name "patches-*" | head -n 1)
-          
-          if [ -z "$PATCH_DIR" ]; then
-            echo "::error::Could not find kernel patch directory!"
-            exit 1
-          fi
-
-          echo "Found kernel patch directory: $PATCH_DIR"
-          
-          # Создаем файл патча с помощью heredoc
-          # Имя 999-....patch гарантирует, что он применится одним из последних
-          cat > "${PATCH_DIR}/999-bpi-r4-add-8gb-ram-support.patch" <<EOF
-          --- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
-          +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts
-          @@ -21,7 +21,7 @@
-           
-           	memory@40000000 {
-           		device_type = "memory";
-          -		reg = <0x0 0x40000000 0x1 0xc0000000>;
-          +		reg = <0x0 0x40000000 0x2 0x00000000>;
-           	};
-           
-           	chosen {
-          EOF
-
-          echo "8GB RAM patch created successfully."
-
       - name: Configure firmware image
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/mediatek/mt7988a/bpi-r4 > .config
@@ -183,7 +152,7 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Override U-Boot with frank-w version via custom feed
+      - name: Override U-Boot with frank-w version and 8GB memory config
         run: |
           # 1. Создаем структуру папок для нашего кастомного фида
           mkdir -p custom_feed/boot/uboot-mediatek
@@ -194,30 +163,27 @@ jobs:
 
           # 3. Модифицируем скопированный Makefile
           echo "Overriding U-Boot Makefile..."
-          
-          # Получаем хеш коммита для стабильности
           UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | awk '{print $1}')
-
-          # Меняем URL, протокол, версию и отключаем хеш
+          
+          # --- Стандартная подмена исходников ---
           sed -i 's/PKG_SOURCE_URL:=.*/PKG_SOURCE_URL:=https:\/\/github.com\/frank-w\/u-boot.git/' $UBOOT_MAKEFILE
           sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
           sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH/" $UBOOT_MAKEFILE
           sed -i 's/PKG_HASH:=.*/PKG_HASH:=skip/' $UBOOT_MAKEFILE
           
-          # ВАЖНО: Указываем путь к кастомному defconfig прямо в Makefile
-          # Это заставит систему сборки саму скопировать его куда нужно
+          # --- Ключевое изменение: добавляем параметр ядра в конфигурацию U-Boot ---
           echo 'define Build/Prepare' >> $UBOOT_MAKEFILE
           echo '	$(call Build/Prepare/Default)' >> $UBOOT_MAKEFILE
+          # Сначала применяем стандартный defconfig от Франка
           echo '	cp $(PKG_BUILD_DIR)/configs/mt7988a_bpir4_emmc_defconfig $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
+          # Затем дописываем в конец этого конфига параметр для командной строки ядра
+          echo '	echo "CONFIG_BOOTARGS=\"console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait memmap=8G\\$$0x40000000\"" >> $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
           echo 'endef' >> $UBOOT_MAKEFILE
 
           # 4. Добавляем наш кастомный фид в начало feeds.conf.default
-          echo "src-link custom ./custom_feed" > feeds.conf.default.tmp
-          cat feeds.conf.default >> feeds.conf.default.tmp
-          mv feeds.conf.default.tmp feeds.conf.default
+          echo "src-link custom ./custom_feed" >> feeds.conf.default
 
-          # 5. Переиндексируем фиды, чтобы система увидела наши изменения
-          ./scripts/feeds update custom
+          # 5. Переиндексируем фиды
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
