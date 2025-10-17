@@ -144,10 +144,6 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
 
-      - name: Patch 8gb
-        run: |
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-bpi-r4-add-8gb-ram-support.patch > target/linux/mediatek/patches-6.12/999-bpi-r4-add-8gb-ram-support.patch
-
       - name: Run defconfig
         run: |
           make defconfig
@@ -190,6 +186,46 @@ jobs:
           # 5. Переиндексируем фиды
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+      - name: Create 8GB RAM patch using Quilt
+        run: |
+          echo "Step 1: Preparing kernel sources..."
+          make target/linux/prepare -j$(nproc) V=s
+
+          echo "Step 2: Entering kernel build directory..."
+          # Находим директорию сборки ядра
+          KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
+          cd "$KBUILD_DIR"
+
+          echo "Step 3: Applying existing patches..."
+          quilt push -a
+
+          echo "Step 4: Creating a new patch for 8GB RAM..."
+          # Создаем новый патч в серии
+          quilt new 999-bpi-r4-add-8gb-ram-support.patch
+          
+          # Находим точный путь к файлу, который будем менять
+          DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
+          echo "Found DTSi file at: $DTSI_FILE"
+
+          # Добавляем этот файл в наш новый патч
+          quilt add "$DTSI_FILE"
+
+          echo "Step 5: Modifying the DTSi file..."
+          # Вносим изменения с помощью sed
+          sed -i '/memory@40000000 {/,/};/c\
+          memory@40000000 {\
+              device_type = "memory";\
+              reg = <0x0 0x40000000 0x2 0x00000000>;\
+          };' "$DTSI_FILE"
+
+          echo "Step 6: Finalizing the patch..."
+          # Quilt автоматически создает идеально отформатированный diff
+          quilt refresh
+          
+          echo "Patch created successfully."
+          # Возвращаемся в корневую директорию
+          cd ../../..
 
       - name: Build the firmware image
         run: |
