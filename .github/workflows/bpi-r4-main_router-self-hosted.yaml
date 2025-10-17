@@ -144,6 +144,10 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
 
+      - name: Patch 8gb
+        run: |
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-bpi-r4-add-8gb-ram-support.patch > target/linux/mediatek/patches-6.12/999-bpi-r4-add-8gb-ram-support.patch
+
       - name: Run defconfig
         run: |
           make defconfig
