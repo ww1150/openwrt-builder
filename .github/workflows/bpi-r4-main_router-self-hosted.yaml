@@ -153,12 +153,6 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Disable BPF host toolchain
-        run: |
-          echo "Disabling BPF host toolchain (llvm-bpf) to prevent build issues..."
-          sed -i 's/^CONFIG_BPF_TOOLCHAIN_HOST=y/# CONFIG_BPF_TOOLCHAIN_HOST is not set/' .config
-          make defconfig
-
       - name: Build the firmware image
         run: |
           make defconfig

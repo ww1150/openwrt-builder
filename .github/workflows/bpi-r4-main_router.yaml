@@ -61,28 +61,6 @@ jobs:
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-      - name: Override U-Boot source to frank-w repository
-        run: |
-          UBOOT_MAKEFILE="package/boot/uboot-mediatek/Makefile"
-
-          echo "Overriding U-Boot source in $UBOOT_MAKEFILE"
-
-          # Указываем, что источник - это git-репозиторий
-          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
-          
-          # Меняем URL на репозиторий frank-w
-          sed -i 's|PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://github.com/frank-w/u-boot.git|' $UBOOT_MAKEFILE
-          
-          # Указываем нужную ветку (bpi-r4 содержит все последние исправления)
-          sed -i 's/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=bpi-r4/' $UBOOT_MAKEFILE
-          
-          # !!! Важно: Удаляем проверку хеша, так как мы качаем из git, а не архив
-          sed -i '/PKG_MIRROR_HASH/d' $UBOOT_MAKEFILE
-          
-          echo "--- Patched uboot-mediatek Makefile ---"
-          cat $UBOOT_MAKEFILE
-          echo "-------------------------------------"
-
       - name: Update and install feeds (with fallback to GitHub mirrors)
         run: |
           if ./scripts/feeds update -a; then
@@ -99,6 +77,7 @@ jobs:
           echo "Feeds updated successfully. Now installing all packages."
           ./scripts/feeds install -a
 
+
       - name: Configure firmware image
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/mediatek/mt7988a/bpi-r4 > .config
@@ -106,51 +85,40 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
 
-      - name: Add packages for rootfs expansion
+      - name: Fix broken dependencies in downloaded config
         run: |
-          echo "CONFIG_PACKAGE_cloud-utils-growpart=y" >> .config
-          echo "CONFIG_PACKAGE_util-linux-fdisk=y" >> .config
-          echo "CONFIG_PACKAGE_e2fsprogs=y" >> .config
+          echo "Fixing missing HTTP/3 library dependencies for curl..."
+          # Если в конфиге включена поддержка HTTP3 для curl, то мы должны явно включить и нужные библиотеки
+          if grep -q "CONFIG_LIBCURL_HTTP3=y" .config; then
+            echo "CONFIG_PACKAGE_libnghttp3=y" >> .config
+            echo "CONFIG_PACKAGE_libngtcp2=y" >> .config
+            echo "HTTP/3 dependencies for curl have been added."
+          fi
 
       - name: Enable MLO
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
 
-      - name: Enable openssl
+      - name: Perform a clean switch to OpenSSL
         run: |
-          sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
+          echo "Performing a clean switch to OpenSSL as the default crypto library..."
 
-      - name: Select 8GB board profile via direct .config manipulation
-        run: |
-          make defconfig
+          grep -v 'CONFIG_PACKAGE_wpad-\|CONFIG_PACKAGE_libmbedtls\|CONFIG_PACKAGE_libwolfssl' .config > .config.tmp && mv .config.tmp .config
 
-          echo "--- Modifying .config to select 8GB profile ---"
+          echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
+          echo "CONFIG_PACKAGE_libopenssl=y" >> .config
 
-          sed -i 's/^\(CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4\)=y/\1=n/' .config
-          
-          sed -i '/CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g/d' .config
-
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi-bpi-r4-8g=y" >> .config
-
-          echo "Regenerating .config to apply changes..."
-          make defconfig
-
-          echo "--- Verifying final .config ---"
-          grep "bpi-r4" .config
-          echo "-------------------------------"
-
-      - name: Add patches for 4GB WED
-        run: |
-          mkdir -p package/kernel/mt76/patches
-          curl -SL https://github.com/LorenzoBianconi/mt76/commit/35bc8effe9e495ccded5d6722b299dafadce060e.patch > package/kernel/mt76/patches/999-mtk-mt76-mt7996-use-GFP_DMA32-for-page_pool.patch
-          curl -SL https://github.com/LorenzoBianconi/net-next/commit/93dfca902f0d79126612b8e3cc553b5d891c1f55.patch > target/linux/mediatek/patches-6.12/999-wed-dma-mask-limitation.patch
-
-      # From https://github.com/LorenzoBianconi/wireless-next/commit/3e444c68513934d47b019b236ad083c386b0d85b
-      - name: Copy patches for WED kernel traceback
-        run: |
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-use-proper-wed-reference-in-wed-kernel.patch > target/linux/mediatek/patches-6.12/999-use-proper-wed-reference-in-wed-kernel.patch
-          curl -SL https://github.com/LorenzoBianconi/mt76/commit/92f22edf7fd119cde26218a7431919e4cdf1628e.patch > package/kernel/mt76/patches/999-use-proper-wed-reference-in-wed-mt76.patch
+      #      - name: Add patches for 4GB WED
+      #        run: |
+      #          mkdir -p package/kernel/mt76/patches
+      #          curl -SL https://github.com/LorenzoBianconi/mt76/commit/35bc8effe9e495ccded5d6722b299dafadce060e.patch > package/kernel/mt76/patches/999-mtk-mt76-mt7996-use-GFP_DMA32-for-page_pool.patch
+      #          curl -SL https://github.com/LorenzoBianconi/net-next/commit/93dfca902f0d79126612b8e3cc553b5d891c1f55.patch > target/linux/mediatek/patches-6.12/999-wed-dma-mask-limitation.patch
+      #
+      #      # From https://github.com/LorenzoBianconi/wireless-next/commit/3e444c68513934d47b019b236ad083c386b0d85b
+      #      - name: Copy patches for WED kernel traceback
+      #        run: |
+      #          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-use-proper-wed-reference-in-wed-kernel.patch > target/linux/mediatek/patches-6.12/999-use-proper-wed-reference-in-wed-kernel.patch
+      #          curl -SL https://github.com/LorenzoBianconi/mt76/commit/92f22edf7fd119cde26218a7431919e4cdf1628e.patch > package/kernel/mt76/patches/999-use-proper-wed-reference-in-wed-mt76.patch
 
 
       #- name: Enable wolfssl
@@ -186,7 +154,44 @@ jobs:
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
       - name: Build the firmware image
-        run: make -j $(nproc) defconfig download world
+        run: |
+          make defconfig
+          # 1. Запускаем download. Ошибки на этом этапе игнорируем.
+          make download -j$(nproc) || true
+
+          # 2. Переходим в папку dl/ и подменяем архив U-Boot. ATF не трогаем.
+          cd dl
+          rm -f u-boot-*.tar.*
+          echo "Downloading correct U-Boot source..."
+          wget -O u-boot-frankw.tar.gz https://github.com/frank-w/u-boot/archive/refs/heads/2025-10-bpi.tar.gz
+          UBOOT_TARGET_NAME=$(find . -name "u-boot-*.stamped" | sed 's|.stamped||' | xargs basename || echo "u-boot-2025.10.tar.bz2")
+          echo "Found target U-Boot name: $UBOOT_TARGET_NAME. Replacing..."
+          mv u-boot-frankw.tar.gz "$UBOOT_TARGET_NAME"
+          echo "Source U-Boot archive has been replaced."
+          cd ..
+
+          # 3. Готовим правильный .config для U-Boot
+          echo "Preparing U-Boot defconfig..."
+          # Создаем временную директорию для распаковки
+          mkdir -p tmp/uboot-src
+          # Распаковываем наш скачанный архив туда
+          tar -xf "dl/$UBOOT_TARGET_NAME" -C tmp/uboot-src --strip-components=1
+          
+          # Создаем директорию, куда OpenWrt сам распакует исходники U-Boot
+          # Имя этой директории предсказуемо
+          UBOOT_BUILD_DIR_TARGET="build_dir/target-aarch64_cortex-a53_musl/u-boot-mediatek-mt7988_bananapi_bpi-r4-emmc"
+          mkdir -p "$UBOOT_BUILD_DIR_TARGET"
+          
+          # Копируем defconfig из наших исходников и переименовываем его в .config в целевой директории
+          echo "Copying emmc defconfig to the target build directory..."
+          cp "tmp/uboot-src/configs/mt7988a_bpir4_emmc_defconfig" "${UBOOT_BUILD_DIR_TARGET}/.config"
+          
+          echo "Defconfig has been placed."
+          
+          # 4. Запускаем основную сборку.
+          # OpenWrt распакует архив в UBOOT_BUILD_DIR_TARGET и увидит там наш .config
+          echo "Starting the main build..."
+          make world -j1 V=sc
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
