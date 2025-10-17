@@ -152,81 +152,77 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Override U-Boot with frank-w version and 8GB memory config
-        run: |
-          # 1. Создаем структуру папок для нашего кастомного фида
-          mkdir -p custom_feed/boot/uboot-mediatek
-
-          # 2. Копируем оригинальный Makefile в наш фид
-          cp package/boot/uboot-mediatek/Makefile custom_feed/boot/uboot-mediatek/Makefile
-          UBOOT_MAKEFILE="custom_feed/boot/uboot-mediatek/Makefile"
-
-          # 3. Модифицируем скопированный Makefile
-          echo "Overriding U-Boot Makefile..."
-          UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | awk '{print $1}')
-          
-          # --- Стандартная подмена исходников ---
-          sed -i 's/PKG_SOURCE_URL:=.*/PKG_SOURCE_URL:=https:\/\/github.com\/frank-w\/u-boot.git/' $UBOOT_MAKEFILE
-          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
-          sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH/" $UBOOT_MAKEFILE
-          sed -i 's/PKG_HASH:=.*/PKG_HASH:=skip/' $UBOOT_MAKEFILE
-          
-          # --- Ключевое изменение: добавляем параметр ядра в конфигурацию U-Boot ---
-          echo 'define Build/Prepare' >> $UBOOT_MAKEFILE
-          echo '	$(call Build/Prepare/Default)' >> $UBOOT_MAKEFILE
-          # Сначала применяем стандартный defconfig от Франка
-          echo '	cp $(PKG_BUILD_DIR)/configs/mt7988a_bpir4_emmc_defconfig $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
-          # Затем дописываем в конец этого конфига параметр для командной строки ядра
-          echo '	echo "CONFIG_BOOTARGS=\"console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait memmap=8G\\$$0x40000000\"" >> $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
-          echo 'endef' >> $UBOOT_MAKEFILE
-
-          # 4. Добавляем наш кастомный фид в начало feeds.conf.default
-          echo "src-link custom ./custom_feed" >> feeds.conf.default
-
-          # 5. Переиндексируем фиды
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+#      - name: Override U-Boot with frank-w version and 8GB memory config
+#        run: |
+#          # 1. Создаем структуру папок для нашего кастомного фида
+#          mkdir -p custom_feed/boot/uboot-mediatek
+#
+#          # 2. Копируем оригинальный Makefile в наш фид
+#          cp package/boot/uboot-mediatek/Makefile custom_feed/boot/uboot-mediatek/Makefile
+#          UBOOT_MAKEFILE="custom_feed/boot/uboot-mediatek/Makefile"
+#
+#          # 3. Модифицируем скопированный Makefile
+#          echo "Overriding U-Boot Makefile..."
+#          UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | awk '{print $1}')
+#
+#          # --- Стандартная подмена исходников ---
+#          sed -i 's/PKG_SOURCE_URL:=.*/PKG_SOURCE_URL:=https:\/\/github.com\/frank-w\/u-boot.git/' $UBOOT_MAKEFILE
+#          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
+#          sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH/" $UBOOT_MAKEFILE
+#          sed -i 's/PKG_HASH:=.*/PKG_HASH:=skip/' $UBOOT_MAKEFILE
+#
+#          # --- Ключевое изменение: добавляем параметр ядра в конфигурацию U-Boot ---
+#          echo 'define Build/Prepare' >> $UBOOT_MAKEFILE
+#          echo '	$(call Build/Prepare/Default)' >> $UBOOT_MAKEFILE
+#          # Сначала применяем стандартный defconfig от Франка
+#          echo '	cp $(PKG_BUILD_DIR)/configs/mt7988a_bpir4_emmc_defconfig $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
+#          # Затем дописываем в конец этого конфига параметр для командной строки ядра
+#          echo '	echo "CONFIG_BOOTARGS=\"console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait memmap=8G\\$$0x40000000\"" >> $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
+#          echo 'endef' >> $UBOOT_MAKEFILE
+#
+#          # 4. Добавляем наш кастомный фид в начало feeds.conf.default
+#          echo "src-link custom ./custom_feed" >> feeds.conf.default
+#
+#          # 5. Переиндексируем фиды
+#          ./scripts/feeds update -a
+#          ./scripts/feeds install -a
 
       - name: Create 8GB RAM patch using Quilt
         run: |
-          make defconfig download -j$(nproc)
           echo "Step 1: Preparing kernel sources..."
           make target/linux/prepare -j$(nproc) V=s
 
           echo "Step 2: Entering kernel build directory..."
-          # Находим директорию сборки ядра
           KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
           cd "$KBUILD_DIR"
 
-          echo "Step 3: Applying existing patches..."
+          echo "Step 3: Initializing Quilt..."
+          # ИСПРАВЛЕНИЕ: Добавляем команду quilt setup
+          # Она найдет Makefile ядра и создаст файл 'series' со списком всех стандартных патчей.
+          quilt setup ../../target/linux/mediatek/Makefile
+
+          echo "Step 4: Applying existing patches..."
+          # Теперь эта команда найдет 'series' и успешно применит все патчи
           quilt push -a
 
-          echo "Step 4: Creating a new patch for 8GB RAM..."
-          # Создаем новый патч в серии
+          echo "Step 5: Creating a new patch for 8GB RAM..."
           quilt new 999-bpi-r4-add-8gb-ram-support.patch
-          
-          # Находим точный путь к файлу, который будем менять
           DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
-          echo "Found DTSi file at: $DTSI_FILE"
-
-          # Добавляем этот файл в наш новый патч
           quilt add "$DTSI_FILE"
 
-          echo "Step 5: Modifying the DTSi file..."
-          # Вносим изменения с помощью sed
+          echo "Step 6: Modifying the DTSi file..."
           sed -i '/memory@40000000 {/,/};/c\
           memory@40000000 {\
               device_type = "memory";\
               reg = <0x0 0x40000000 0x2 0x00000000>;\
           };' "$DTSI_FILE"
 
-          echo "Step 6: Finalizing the patch..."
-          # Quilt автоматически создает идеально отформатированный diff
+          echo "Step 7: Finalizing the patch..."
           quilt refresh
           
-          echo "Patch created successfully."
-          # Возвращаемся в корневую директорию
-          cd ../../..
+          echo "Patch created successfully. Going back to root..."
+          # Выходим из директории сборки ядра, чтобы следующий шаг make сработал
+          cd -
 
       - name: Build the firmware image
         run: |
