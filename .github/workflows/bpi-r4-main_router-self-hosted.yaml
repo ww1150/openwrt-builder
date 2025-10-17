@@ -159,38 +159,42 @@ jobs:
           # 1. Запускаем download. Ошибки на этом этапе игнорируем.
           make download -j$(nproc) || true
 
-          # 2. Переходим в папку dl/ и подменяем архив U-Boot. ATF не трогаем.
+          # 2. Переходим в папку dl/ и подменяем архив U-Boot.
           cd dl
           rm -f u-boot-*.tar.*
-          echo "Downloading correct U-Boot source..."
+          echo "Downloading correct U-Boot source (tar.gz format)..."
           wget -O u-boot-frankw.tar.gz https://github.com/frank-w/u-boot/archive/refs/heads/2025-10-bpi.tar.gz
+          
+          # ИСПРАВЛЕНИЕ: Конвертируем .tar.gz в .tar.bz2
+          echo "Converting archive to tar.bz2 format..."
+          # Распаковываем скачанный архив
+          gunzip u-boot-frankw.tar.gz
+          # Запаковываем его обратно с помощью bzip2
+          bzip2 u-boot-frankw.tar
+          # Теперь у нас есть файл u-boot-frankw.tar.bz2
+          
           UBOOT_TARGET_NAME=$(find . -name "u-boot-*.stamped" | sed 's|.stamped||' | xargs basename || echo "u-boot-2025.10.tar.bz2")
           echo "Found target U-Boot name: $UBOOT_TARGET_NAME. Replacing..."
-          mv u-boot-frankw.tar.gz "$UBOOT_TARGET_NAME"
-          echo "Source U-Boot archive has been replaced."
+          # Переименовываем наш перепакованный архив в целевое имя
+          mv u-boot-frankw.tar.bz2 "$UBOOT_TARGET_NAME"
+          
+          echo "Source U-Boot archive has been replaced with correct format. Listing dl/ directory:"
+          ls -la
           cd ..
 
           # 3. Готовим правильный .config для U-Boot
           echo "Preparing U-Boot defconfig..."
-          # Создаем временную директорию для распаковки
           mkdir -p tmp/uboot-src
-          # Распаковываем наш скачанный архив туда
           tar -xf "dl/$UBOOT_TARGET_NAME" -C tmp/uboot-src --strip-components=1
-          
-          # Создаем директорию, куда OpenWrt сам распакует исходники U-Boot
-          # Имя этой директории предсказуемо
           UBOOT_BUILD_DIR_TARGET="build_dir/target-aarch64_cortex-a53_musl/u-boot-mediatek-mt7988_bananapi_bpi-r4-emmc"
           mkdir -p "$UBOOT_BUILD_DIR_TARGET"
-          
-          # Копируем defconfig из наших исходников и переименовываем его в .config в целевой директории
           echo "Copying emmc defconfig to the target build directory..."
           cp "tmp/uboot-src/configs/mt7988a_bpir4_emmc_defconfig" "${UBOOT_BUILD_DIR_TARGET}/.config"
-          
           echo "Defconfig has been placed."
           
-          # 4. Запускаем основную сборку.
-          # OpenWrt распакует архив в UBOOT_BUILD_DIR_TARGET и увидит там наш .config
+          # 4. Запускаем основную сборку. Теперь bzcat будет доволен.
           echo "Starting the main build..."
+          # Возвращаем многопоточную сборку, так как проблема была не в ней
           make world -j$(nproc) V=s
 
       - name: Package output
