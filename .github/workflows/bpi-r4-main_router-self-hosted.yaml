@@ -153,6 +153,12 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
+      - name: Disable problematic host tools
+        run: |
+          echo "Disabling llvm-bpf host tool to prevent build issues..."
+          # Эта команда выключит опцию сборки llvm-bpf в tools
+          sed -i 's/CONFIG_TOOLCHAINOPTS_USE_LLVM_BPF=y/# CONFIG_TOOLCHAINOPTS_USE_LLVM_BPF is not set/' .config
+
       - name: Build the firmware image
         run: |
           make defconfig
