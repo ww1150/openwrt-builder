@@ -152,39 +152,34 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Create and place ATF patches for 8GB RAM
+      - name: Apply 8GB RAM patches directly to ATF files
         run: |
           BUILD_ROOT=$(pwd)
           
-          echo "Step 1: Preparing a sandbox ATF build to create patches..."
-          # Готовим исходники ЛЮБОГО варианта ATF, просто чтобы получить доступ к файлам
-          make package/boot/arm-trusted-firmware-mediatek/prepare V=s
+          echo "Step 1: Preparing ATF sources..."
+          make package/boot/arm-trusted-firmware-mediatek/prepare -j$(nproc) V=s
 
-          ATF_BUILD_DIR=$(find build_dir/ -type d -name "arm-trusted-firmware-mediatek-*" | head -n 1)
-          ATF_SOURCE_DIR=$(find "$ATF_BUILD_DIR" -mindepth 1 -maxdepth 1 -type d)
-          cd "$ATF_SOURCE_DIR"
-
-          echo "Step 2: Creating patch for dram-configs.mk..."
-          quilt new 998-atf-add-8gb-dram-size.patch
-          DRAM_CONFIG_FILE="plat/mediatek/mt7988/drivers/dram/dram-configs.mk"
-          quilt add "$DRAM_CONFIG_FILE"
+          # --- Патчим dram-configs.mk ---
+          echo "Step 2: Patching dram-configs.mk..."
+          # Находим точный и единственный путь к нужному файлу
+          DRAM_CONFIG_FILE=$(find "$BUILD_ROOT/build_dir" -type f -path "*/plat/mediatek/mt7988/drivers/dram/dram-configs.mk")
+          if [ -z "$DRAM_CONFIG_FILE" ]; then
+            echo "::error::dram-configs.mk for mt7988 not found!"
+            exit 1
+          fi
+          echo "Found dram-configs.mk at: $DRAM_CONFIG_FILE"
+          # Вносим изменение напрямую
           sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$DRAM_CONFIG_FILE"
-          quilt refresh
-
-          echo "Step 3: Creating patch to add 8GB build flag..."
-          quilt pop -a
-          ATF_PACKAGE_MAKEFILE="${BUILD_ROOT}/package/boot/arm-trusted-firmware-mediatek/Makefile"
-          quilt new 999-atf-enable-8gb-mode.patch
-          quilt add "$ATF_PACKAGE_MAKEFILE"
+          
+          # --- Патчим Makefile пакета ---
+          echo "Step 3: Patching ATF package Makefile..."
+          ATF_PACKAGE_MAKEFILE="$BUILD_ROOT/package/boot/arm-trusted-firmware-mediatek/Makefile"
+          # Добавляем флаг DDR4_4BG_MODE=1 в опции сборки
           sed -i '/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/' "$ATF_PACKAGE_MAKEFILE"
-          quilt refresh
           
-          echo "Step 4: Copying created patches to the package source directory..."
-          # Копируем наши свежесозданные патчи в директорию пакета
-          cp patches/* "${BUILD_ROOT}/package/boot/arm-trusted-firmware-mediatek/patches/"
-          
-          echo "Patches created and deployed. Going back to root..."
-          cd -
+          echo "Patches applied directly. Verifying changes:"
+          grep "4096" "$DRAM_CONFIG_FILE"
+          grep "DDR4_4BG_MODE" "$ATF_PACKAGE_MAKEFILE"
 
       - name: Cleaning previous ATF build
         run: |
