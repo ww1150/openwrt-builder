@@ -154,28 +154,33 @@ jobs:
 
       - name: Create ATF patches for 8GB RAM using Quilt
         run: |
+          BUILD_ROOT=$(pwd)
+          
           echo "Step 1: Preparing ATF sources..."
+          # Готовим исходники ATF (распаковываем и применяем стандартные патчи)
           make package/boot/arm-trusted-firmware-mediatek/prepare -j$(nproc) V=s
-
+          
+          # Находим директорию сборки ATF
           ATF_BUILD_DIR=$(find build_dir/ -type d -name "arm-trusted-firmware-mediatek-*" | head -n 1)
           cd "$ATF_BUILD_DIR"
-
+          
           echo "Step 2: Creating patch for dram-configs.mk..."
           quilt new 998-atf-add-8gb-dram-size.patch
-          
-          # ИСПРАВЛЕНИЕ: Указываем точный путь к нужному файлу
+          # Указываем точный относительный путь к файлу внутри исходников ATF
           DRAM_CONFIG_FILE="plat/mediatek/mt7988/drivers/dram/dram-configs.mk"
-          
           quilt add "$DRAM_CONFIG_FILE"
+          # Добавляем 4096 в список размеров
           sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$DRAM_CONFIG_FILE"
           quilt refresh
-
+          
           echo "Step 3: Creating patch to add 8GB build flag..."
+          # Откатываемся, чтобы создать второй, независимый патч
           quilt pop -a
-          # Мы находимся в build_dir, поэтому путь к Makefile пакета должен быть относительным оттуда
-          ATF_PACKAGE_MAKEFILE="../../package/boot/arm-trusted-firmware-mediatek/Makefile"
+          # Указываем абсолютный путь к Makefile пакета
+          ATF_PACKAGE_MAKEFILE="${BUILD_ROOT}/package/boot/arm-trusted-firmware-mediatek/Makefile"
           quilt new 999-atf-enable-8gb-mode.patch
           quilt add "$ATF_PACKAGE_MAKEFILE"
+          # Добавляем флаг DDR4_4BG_MODE=1 в опции сборки
           sed -i '/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/' "$ATF_PACKAGE_MAKEFILE"
           quilt refresh
           
