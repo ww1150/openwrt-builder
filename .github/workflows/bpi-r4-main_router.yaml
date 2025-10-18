@@ -44,7 +44,7 @@ jobs:
             build-essential clang flex bison g++ gawk \
             gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
             python3-setuptools rsync swig unzip zlib1g-dev file wget curl zstd \
-            git
+            git quilt
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
@@ -153,45 +153,46 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
+      - name: Create 8GB RAM patch using Quilt
+        run: |
+          BUILD_ROOT=$(pwd)
+          echo "Build root is: ${BUILD_ROOT}"
+
+          echo "Step 1: Preparing kernel sources..."
+          make target/linux/prepare -j$(nproc) V=s
+
+          KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
+          cd "$KBUILD_DIR"
+
+          echo "Step 2: Creating a new patch for 8GB RAM..."
+          # Мы убрали 'quilt setup' и 'push'
+          quilt new 999-bpi-r4-add-8gb-ram-support.patch
+          DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
+          quilt add "$DTSI_FILE"
+
+          echo "Step 3: Modifying the DTSi file..."
+          sed -i '/memory@40000000 {/,/};/c\
+          memory@40000000 {\
+              device_type = "memory";\
+              reg = <0x0 0x40000000 0x2 0x00000000>;\
+          };' "$DTSI_FILE"
+
+          echo "Step 4: Finalizing the patch..."
+          quilt refresh
+          
+          echo "Patch created successfully. Going back to root..."
+          cd -
+
+      - name: Clean kernel for repatching
+        run: |
+          echo "Cleaning previous kernel build to ensure patch is applied..."
+          make target/linux/clean -j$(nproc) V=s
+
       - name: Build the firmware image
         run: |
           make defconfig
-          # 1. Запускаем download. Ошибки на этом этапе игнорируем.
           make download -j$(nproc) || true
-
-          # 2. Переходим в папку dl/ и подменяем архив U-Boot. ATF не трогаем.
-          cd dl
-          rm -f u-boot-*.tar.*
-          echo "Downloading correct U-Boot source..."
-          wget -O u-boot-frankw.tar.gz https://github.com/frank-w/u-boot/archive/refs/heads/2025-10-bpi.tar.gz
-          UBOOT_TARGET_NAME=$(find . -name "u-boot-*.stamped" | sed 's|.stamped||' | xargs basename || echo "u-boot-2025.10.tar.bz2")
-          echo "Found target U-Boot name: $UBOOT_TARGET_NAME. Replacing..."
-          mv u-boot-frankw.tar.gz "$UBOOT_TARGET_NAME"
-          echo "Source U-Boot archive has been replaced."
-          cd ..
-
-          # 3. Готовим правильный .config для U-Boot
-          echo "Preparing U-Boot defconfig..."
-          # Создаем временную директорию для распаковки
-          mkdir -p tmp/uboot-src
-          # Распаковываем наш скачанный архив туда
-          tar -xf "dl/$UBOOT_TARGET_NAME" -C tmp/uboot-src --strip-components=1
-          
-          # Создаем директорию, куда OpenWrt сам распакует исходники U-Boot
-          # Имя этой директории предсказуемо
-          UBOOT_BUILD_DIR_TARGET="build_dir/target-aarch64_cortex-a53_musl/u-boot-mediatek-mt7988_bananapi_bpi-r4-emmc"
-          mkdir -p "$UBOOT_BUILD_DIR_TARGET"
-          
-          # Копируем defconfig из наших исходников и переименовываем его в .config в целевой директории
-          echo "Copying emmc defconfig to the target build directory..."
-          cp "tmp/uboot-src/configs/mt7988a_bpir4_emmc_defconfig" "${UBOOT_BUILD_DIR_TARGET}/.config"
-          
-          echo "Defconfig has been placed."
-          
-          # 4. Запускаем основную сборку.
-          # OpenWrt распакует архив в UBOOT_BUILD_DIR_TARGET и увидит там наш .config
-          echo "Starting the main build..."
-          make world -j1 V=sc
+          make world -j$(nproc) V=s
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic

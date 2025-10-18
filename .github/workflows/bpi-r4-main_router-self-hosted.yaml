@@ -219,8 +219,8 @@ jobs:
 
       - name: Clean kernel for repatching
         run: |
-          echo "Forcing kernel to be re-patched by cleaning its prepared state..."
-          rm -f build_dir/target-aarch64_cortex-a53_musl/linux-mediatek_filogic/linux-*/.prepared*
+          echo "Cleaning previous kernel build to ensure patch is applied..."
+          make target/linux/clean -j$(nproc) V=s
 
       - name: Build the firmware image
         run: |
