@@ -152,75 +152,42 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-#      - name: Override U-Boot with frank-w version and 8GB memory config
-#        run: |
-#          # 1. Создаем структуру папок для нашего кастомного фида
-#          mkdir -p custom_feed/boot/uboot-mediatek
-#
-#          # 2. Копируем оригинальный Makefile в наш фид
-#          cp package/boot/uboot-mediatek/Makefile custom_feed/boot/uboot-mediatek/Makefile
-#          UBOOT_MAKEFILE="custom_feed/boot/uboot-mediatek/Makefile"
-#
-#          # 3. Модифицируем скопированный Makefile
-#          echo "Overriding U-Boot Makefile..."
-#          UBOOT_COMMIT_HASH=$(git ls-remote https://github.com/frank-w/u-boot.git 2025-10-bpi | awk '{print $1}')
-#
-#          # --- Стандартная подмена исходников ---
-#          sed -i 's/PKG_SOURCE_URL:=.*/PKG_SOURCE_URL:=https:\/\/github.com\/frank-w\/u-boot.git/' $UBOOT_MAKEFILE
-#          sed -i 's/PKG_SOURCE_PROTO:=.*/PKG_SOURCE_PROTO:=git/' $UBOOT_MAKEFILE
-#          sed -i "s/PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$UBOOT_COMMIT_HASH/" $UBOOT_MAKEFILE
-#          sed -i 's/PKG_HASH:=.*/PKG_HASH:=skip/' $UBOOT_MAKEFILE
-#
-#          # --- Ключевое изменение: добавляем параметр ядра в конфигурацию U-Boot ---
-#          echo 'define Build/Prepare' >> $UBOOT_MAKEFILE
-#          echo '	$(call Build/Prepare/Default)' >> $UBOOT_MAKEFILE
-#          # Сначала применяем стандартный defconfig от Франка
-#          echo '	cp $(PKG_BUILD_DIR)/configs/mt7988a_bpir4_emmc_defconfig $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
-#          # Затем дописываем в конец этого конфига параметр для командной строки ядра
-#          echo '	echo "CONFIG_BOOTARGS=\"console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait memmap=8G\\$$0x40000000\"" >> $(PKG_BUILD_DIR)/.config' >> $UBOOT_MAKEFILE
-#          echo 'endef' >> $UBOOT_MAKEFILE
-#
-#          # 4. Добавляем наш кастомный фид в начало feeds.conf.default
-#          echo "src-link custom ./custom_feed" >> feeds.conf.default
-#
-#          # 5. Переиндексируем фиды
-#          ./scripts/feeds update -a
-#          ./scripts/feeds install -a
-
-      - name: Create 8GB RAM patch using Quilt
+      - name: Create ATF patches for 8GB RAM using Quilt
         run: |
-          BUILD_ROOT=$(pwd)
-          echo "Build root is: ${BUILD_ROOT}"
+          echo "Step 1: Preparing ATF sources..."
+          # Эта команда распакует ATF и применит стандартные патчи
+          make package/boot/arm-trusted-firmware-mediatek/prepare -j$(nproc) V=s
 
-          echo "Step 1: Preparing kernel sources..."
-          make target/linux/prepare -j$(nproc) V=s
+          # Находим директорию сборки ATF
+          ATF_BUILD_DIR=$(find build_dir/ -type d -name "arm-trusted-firmware-mediatek-*" | head -n 1)
+          cd "$ATF_BUILD_DIR"
 
-          KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
-          cd "$KBUILD_DIR"
+          echo "Step 2: Creating patch for dram-configs.mk..."
+          quilt new 998-atf-add-8gb-dram-size.patch
+          DRAM_CONFIG_FILE=$(find . -type f -name "dram-configs.mk")
+          quilt add "$DRAM_CONFIG_FILE"
+          # Добавляем 4096 в список размеров
+          sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$DRAM_CONFIG_FILE"
+          quilt refresh
 
-          echo "Step 2: Creating a new patch for 8GB RAM..."
-          # Мы убрали 'quilt setup' и 'push'
-          quilt new 999-bpi-r4-add-8gb-ram-support.patch
-          DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
-          quilt add "$DTSI_FILE"
-
-          echo "Step 3: Modifying the DTSi file..."
-          sed -i '/memory@40000000 {/,/};/c\
-          memory@40000000 {\
-              device_type = "memory";\
-              reg = <0x0 0x40000000 0x2 0x00000000>;\
-          };' "$DTSI_FILE"
-
-          echo "Step 4: Finalizing the patch..."
+          echo "Step 3: Creating patch to add 8GB build flag..."
+          # Выходим из quilt, чтобы создать второй патч
+          quilt pop -a
+          # Находим Makefile пакета ATF
+          ATF_PACKAGE_MAKEFILE="../../package/boot/arm-trusted-firmware-mediatek/Makefile"
+          quilt new 999-atf-enable-8gb-mode.patch
+          quilt add "$ATF_PACKAGE_MAKEFILE"
+          # Добавляем флаг DDR4_4BG_MODE=1 в опции сборки
+          sed -i "/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/" "$ATF_PACKAGE_MAKEFILE"
           quilt refresh
           
-          echo "Patch created successfully. Going back to root..."
+          echo "Patches created successfully. Going back to root..."
           cd -
 
-      - name: Clean kernel for repatching
+      - name: Cleaning previous ATF build
         run: |
-          echo "Cleaning previous kernel build to ensure patch is applied..."
-          make target/linux/clean -j$(nproc) V=s
+          echo "Cleaning previous ATF build to ensure patches are applied..."
+          make package/boot/arm-trusted-firmware-mediatek/clean -j$(nproc) V=s
 
       - name: Build the firmware image
         run: |
