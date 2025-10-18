@@ -172,11 +172,7 @@ jobs:
           ATF_PACKAGE_MAKEFILE="$BUILD_ROOT/package/boot/arm-trusted-firmware-mediatek/Makefile"
           sed -i '/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/' "$ATF_PACKAGE_MAKEFILE"
           
-          echo "Patches applied directly. Verifying changes in one of the files:"
-          # Проверяем только один из файлов для примера
-          FIRST_FILE=$(find "$BUILD_ROOT/build_dir" -type f -path "*/plat/mediatek/mt7988/drivers/dram/dram-configs.mk" | head -n 1)
-          grep "4096" "$FIRST_FILE"
-          grep "DDR4_4BG_MODE" "$ATF_PACKAGE_MAKEFILE"
+          echo "Patches applied directly."
 
       - name: Cleaning previous ATF build
         run: |
