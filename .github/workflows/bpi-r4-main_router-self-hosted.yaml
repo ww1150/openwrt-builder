@@ -152,44 +152,28 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Apply 8GB RAM patches to ATF
-        run: |
-          # --- ШАГ 1: Создаем патч для dram-configs.mk ---
-          cat > ./package/boot/arm-trusted-firmware-mediatek/patches/999-atf-add-8gb-dram-size.patch <<EOF
-          --- a/plat/mediatek/mt7988/drivers/dram/dram-configs.mk
-          +++ b/plat/mediatek/mt7988/drivers/dram/dram-configs.mk
-          @@ -21,5 +21,5 @@
-           # Whether supports DDR4
-           ifeq (\$(DRAM_USE_DDR4), 1)
-           BL2_CPPFLAGS		+= -DDRAM_USE_DDR4
-          -AVAIL_DRAM_SIZE		:=	1024 2048
-          +AVAIL_DRAM_SIZE		:=	1024 2048 4096
-           else
-           override DRAM_USE_DDR4	:= 0
-           AVAIL_DRAM_SIZE		:=	256 512
-          EOF
-          
-          # --- ШАГ 2: Добавляем флаг сборки в Makefile пакета ---
-          ATF_PACKAGE_MAKEFILE="./package/boot/arm-trusted-firmware-mediatek/Makefile"
-          # Просто дописываем в конец файла инструкцию по добавлению флага.
-          # Это сработает независимо от структуры Makefile.
-          echo "" >> "$ATF_PACKAGE_MAKEFILE"
-          echo "MAKE_OPTS+=DDR4_4BG_MODE=1" >> "$ATF_PACKAGE_MAKEFILE"
-          
-          echo "Patches created and applied. Verifying changes:"
-          cat ./package/boot/arm-trusted-firmware-mediatek/patches/999-atf-add-8gb-dram-size.patch
-          grep "DDR4_4BG_MODE" "$ATF_PACKAGE_MAKEFILE"
-
-      - name: Cleaning previous ATF build
-        run: |
-          echo "Cleaning previous ATF build to ensure patches are applied..."
-          make package/boot/arm-trusted-firmware-mediatek/clean -j$(nproc) V=s
-
       - name: Build the firmware image
         run: |
           make defconfig
           make download -j$(nproc) || true
           make world -j$(nproc) V=s
+
+      - name: Patch the generated image with 8GB bl2
+        run: |
+          echo "Step 1: Finding the generated SD card image..."
+          GZ_IMAGE_FILE=$(find bin/targets/mediatek/filogic -name "*sdcard.img.gz")
+          gunzip -f "$GZ_IMAGE_FILE"
+          IMAGE_FILE="${GZ_IMAGE_FILE%.gz}"
+
+          echo "Step 2: Downloading the 8GB bl2 from Frank-w's releases..."
+          wget https://github.com/frank-w/u-boot/releases/download/CI-BUILD-2025-10-bpi-2025.10-2025-10-13_1032/bpi-r4_sdmmc_8GB_bl2.img
+
+          echo "Step 3: Patching the image with the 8GB bl2..."
+          # Записываем bl2 в начало файла образа, где находится первый раздел
+          dd if=bpi-r4_sdmmc_8GB_bl2.img of="$IMAGE_FILE" conv=notrunc
+
+          echo "Step 4: Repacking the patched image..."
+          gzip -f9 "$IMAGE_FILE"
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
