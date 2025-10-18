@@ -152,24 +152,20 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Create ATF patches for 8GB RAM using Quilt
+      - name: Create and place ATF patches for 8GB RAM
         run: |
           BUILD_ROOT=$(pwd)
           
-          echo "Step 1: Preparing ATF sources..."
-          make package/boot/arm-trusted-firmware-mediatek/prepare -j$(nproc) V=s
+          echo "Step 1: Preparing a sandbox ATF build to create patches..."
+          # Готовим исходники ЛЮБОГО варианта ATF, просто чтобы получить доступ к файлам
+          make package/boot/arm-trusted-firmware-mediatek/prepare V=s
 
-          # Находим директорию сборки ATF
           ATF_BUILD_DIR=$(find build_dir/ -type d -name "arm-trusted-firmware-mediatek-*" | head -n 1)
-          # ИСПРАВЛЕНИЕ: Находим поддиректорию с исходным кодом
           ATF_SOURCE_DIR=$(find "$ATF_BUILD_DIR" -mindepth 1 -maxdepth 1 -type d)
-          
-          # Переходим СРАЗУ в директорию с исходниками
           cd "$ATF_SOURCE_DIR"
 
           echo "Step 2: Creating patch for dram-configs.mk..."
           quilt new 998-atf-add-8gb-dram-size.patch
-          # Теперь относительный путь будет правильным
           DRAM_CONFIG_FILE="plat/mediatek/mt7988/drivers/dram/dram-configs.mk"
           quilt add "$DRAM_CONFIG_FILE"
           sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$DRAM_CONFIG_FILE"
@@ -177,14 +173,17 @@ jobs:
 
           echo "Step 3: Creating patch to add 8GB build flag..."
           quilt pop -a
-          # Этот Makefile находится ВНЕ директории с исходниками, поэтому нужен абсолютный путь
           ATF_PACKAGE_MAKEFILE="${BUILD_ROOT}/package/boot/arm-trusted-firmware-mediatek/Makefile"
           quilt new 999-atf-enable-8gb-mode.patch
           quilt add "$ATF_PACKAGE_MAKEFILE"
           sed -i '/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/' "$ATF_PACKAGE_MAKEFILE"
           quilt refresh
           
-          echo "Patches created successfully. Going back to root..."
+          echo "Step 4: Copying created patches to the package source directory..."
+          # Копируем наши свежесозданные патчи в директорию пакета
+          cp patches/* "${BUILD_ROOT}/package/boot/arm-trusted-firmware-mediatek/patches/"
+          
+          echo "Patches created and deployed. Going back to root..."
           cd -
 
       - name: Cleaning previous ATF build
