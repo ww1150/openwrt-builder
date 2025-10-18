@@ -155,7 +155,6 @@ jobs:
       - name: Apply 8GB RAM patches to ATF
         run: |
           # --- ШАГ 1: Создаем патч для dram-configs.mk ---
-          # Этот патч будет применен к исходному коду ATF во время сборки.
           cat > ./package/boot/arm-trusted-firmware-mediatek/patches/999-atf-add-8gb-dram-size.patch <<EOF
           --- a/plat/mediatek/mt7988/drivers/dram/dram-configs.mk
           +++ b/plat/mediatek/mt7988/drivers/dram/dram-configs.mk
@@ -170,9 +169,12 @@ jobs:
            AVAIL_DRAM_SIZE		:=	256 512
           EOF
           
-          # --- ШАГ 2: Модифицируем Makefile пакета, чтобы добавить флаг сборки ---
+          # --- ШАГ 2: Добавляем флаг сборки в Makefile пакета ---
           ATF_PACKAGE_MAKEFILE="./package/boot/arm-trusted-firmware-mediatek/Makefile"
-          sed -i '/define Build\/Compile\/Default/,/endef/ { /MAKE.*-C \$(PKG_BUILD_DIR)/ s/$/ DDR4_4BG_MODE=1/ }' "$ATF_PACKAGE_MAKEFILE"
+          # Просто дописываем в конец файла инструкцию по добавлению флага.
+          # Это сработает независимо от структуры Makefile.
+          echo "" >> "$ATF_PACKAGE_MAKEFILE"
+          echo "MAKE_OPTS+=DDR4_4BG_MODE=1" >> "$ATF_PACKAGE_MAKEFILE"
           
           echo "Patches created and applied. Verifying changes:"
           cat ./package/boot/arm-trusted-firmware-mediatek/patches/999-atf-add-8gb-dram-size.patch
