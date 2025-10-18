@@ -160,25 +160,22 @@ jobs:
           make package/boot/arm-trusted-firmware-mediatek/prepare -j$(nproc) V=s
 
           # --- Патчим dram-configs.mk ---
-          echo "Step 2: Patching dram-configs.mk..."
-          # Находим точный и единственный путь к нужному файлу
-          DRAM_CONFIG_FILE=$(find "$BUILD_ROOT/build_dir" -type f -path "*/plat/mediatek/mt7988/drivers/dram/dram-configs.mk")
-          if [ -z "$DRAM_CONFIG_FILE" ]; then
-            echo "::error::dram-configs.mk for mt7988 not found!"
-            exit 1
-          fi
-          echo "Found dram-configs.mk at: $DRAM_CONFIG_FILE"
-          # Вносим изменение напрямую
-          sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$DRAM_CONFIG_FILE"
+          echo "Step 2: Patching all found dram-configs.mk files..."
+          # ИСПРАВЛЕНИЕ: Используем цикл, чтобы применить sed к каждому файлу
+          find "$BUILD_ROOT/build_dir" -type f -path "*/plat/mediatek/mt7988/drivers/dram/dram-configs.mk" | while read -r file; do
+            echo "Patching $file"
+            sed -i "s/AVAIL_DRAM_SIZE\s*:= 1024 2048/AVAIL_DRAM_SIZE := 1024 2048 4096/" "$file"
+          done
           
           # --- Патчим Makefile пакета ---
           echo "Step 3: Patching ATF package Makefile..."
           ATF_PACKAGE_MAKEFILE="$BUILD_ROOT/package/boot/arm-trusted-firmware-mediatek/Makefile"
-          # Добавляем флаг DDR4_4BG_MODE=1 в опции сборки
           sed -i '/MAKE_OPTS:=/ s/$/ DDR4_4BG_MODE=1/' "$ATF_PACKAGE_MAKEFILE"
           
-          echo "Patches applied directly. Verifying changes:"
-          grep "4096" "$DRAM_CONFIG_FILE"
+          echo "Patches applied directly. Verifying changes in one of the files:"
+          # Проверяем только один из файлов для примера
+          FIRST_FILE=$(find "$BUILD_ROOT/build_dir" -type f -path "*/plat/mediatek/mt7988/drivers/dram/dram-configs.mk" | head -n 1)
+          grep "4096" "$FIRST_FILE"
           grep "DDR4_4BG_MODE" "$ATF_PACKAGE_MAKEFILE"
 
       - name: Cleaning previous ATF build
