@@ -217,13 +217,10 @@ jobs:
           echo "Patch created successfully. Going back to root..."
           cd -
 
-      - name: Force kernel re-patching and build
+      - name: Clean kernel for repatching
         run: |
           echo "Forcing kernel to be re-patched by cleaning its prepared state..."
           rm -f build_dir/target-aarch64_cortex-a53_musl/linux-mediatek_filogic/linux-*/.prepared*
-          
-          echo "Starting the main build..."
-          make world -j$(nproc) V=s
 
       - name: Build the firmware image
         run: |
