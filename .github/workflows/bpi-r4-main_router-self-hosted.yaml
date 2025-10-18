@@ -160,20 +160,39 @@ jobs:
 
       - name: Patch the generated image with 8GB bl2
         run: |
-          echo "Step 1: Finding the generated SD card image..."
-          GZ_IMAGE_FILE=$(find bin/targets/mediatek/filogic -name "*sdcard.img.gz")
+          echo "Step 1: Finding and unpacking the generated SD card image..."
+          IMAGE_DIR=$(find bin/targets/mediatek/filogic -type d)
+          GZ_IMAGE_FILE=$(find "$IMAGE_DIR" -name "*sdcard.img.gz")
           gunzip -f "$GZ_IMAGE_FILE"
           IMAGE_FILE="${GZ_IMAGE_FILE%.gz}"
 
-          echo "Step 2: Downloading the 8GB bl2 from Frank-w's releases..."
-          wget https://github.com/frank-w/u-boot/releases/download/CI-BUILD-2025-10-bpi-2025.10-2025-10-13_1032/bpi-r4_sdmmc_8GB_bl2.img
+          echo "Step 2: Downloading the 8GB bl2..."
+          wget https://github.com/frank-w/u-boot/releases/download/CI-BUILD-2025-10-bpi-2025-10-13_1707/bpi-r4_sdmmc_8GB_bl2.img
 
-          echo "Step 3: Patching the image with the 8GB bl2..."
-          # Записываем bl2 в начало файла образа, где находится первый раздел
-          dd if=bpi-r4_sdmmc_8GB_bl2.img of="$IMAGE_FILE" conv=notrunc
-
+          echo "Step 3: Patching the image using a loop device (requires sudo)..."
+          
+          # Находим свободное loop-устройство
+          LOOP_DEV=$(sudo losetup -f)
+          
+          echo "Associating $IMAGE_FILE with $LOOP_DEV..."
+          # Подключаем образ как loop-устройство с поиском разделов
+          sudo losetup --partscan "$LOOP_DEV" "$IMAGE_FILE"
+          
+          # Ждем, пока узлы разделов появятся в /dev
+          sleep 2
+          
+          # Записываем bl2 ТОЧНО в первый раздел
+          echo "Writing 8GB bl2 to ${LOOP_DEV}p1..."
+          sudo dd if=bpi-r4_sdmmc_8GB_bl2.img of="${LOOP_DEV}p1" conv=notrunc,fsync
+          
+          echo "Detaching loop device..."
+          # Отключаем loop-устройство
+          sudo losetup -d "$LOOP_DEV"
+          
           echo "Step 4: Repacking the patched image..."
           gzip -f9 "$IMAGE_FILE"
+
+          echo "Image successfully patched. Balena Etcher should now accept it."
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
