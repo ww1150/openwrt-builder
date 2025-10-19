@@ -84,16 +84,6 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
 
-      - name: Fix broken dependencies in downloaded config
-        run: |
-          echo "Fixing missing HTTP/3 library dependencies for curl..."
-          # Если в конфиге включена поддержка HTTP3 для curl, то мы должны явно включить и нужные библиотеки
-          if grep -q "CONFIG_LIBCURL_HTTP3=y" .config; then
-            echo "CONFIG_PACKAGE_libnghttp3=y" >> .config
-            echo "CONFIG_PACKAGE_libngtcp2=y" >> .config
-            echo "HTTP/3 dependencies for curl have been added."
-          fi
-
       - name: Enable MLO
         run: |
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
@@ -156,7 +146,7 @@ jobs:
         run: |
           make defconfig
           make download -j$(nproc) || true
-          make world -j$(nproc) V=s
+          make world -j$(nproc)
 
       - name: Patch the generated image with 8GB bl2
         run: |

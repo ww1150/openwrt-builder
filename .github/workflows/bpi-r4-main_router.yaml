@@ -44,7 +44,7 @@ jobs:
             build-essential clang flex bison g++ gawk \
             gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
             python3-setuptools rsync swig unzip zlib1g-dev file wget curl zstd \
-            git quilt
+            git quilt jq
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
@@ -84,16 +84,6 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
-
-      - name: Fix broken dependencies in downloaded config
-        run: |
-          echo "Fixing missing HTTP/3 library dependencies for curl..."
-          # Если в конфиге включена поддержка HTTP3 для curl, то мы должны явно включить и нужные библиотеки
-          if grep -q "CONFIG_LIBCURL_HTTP3=y" .config; then
-            echo "CONFIG_PACKAGE_libnghttp3=y" >> .config
-            echo "CONFIG_PACKAGE_libngtcp2=y" >> .config
-            echo "HTTP/3 dependencies for curl have been added."
-          fi
 
       - name: Enable MLO
         run: |
@@ -153,46 +143,45 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
-      - name: Create 8GB RAM patch using Quilt
-        run: |
-          BUILD_ROOT=$(pwd)
-          echo "Build root is: ${BUILD_ROOT}"
-
-          echo "Step 1: Preparing kernel sources..."
-          make target/linux/prepare -j$(nproc) V=s
-
-          KBUILD_DIR=$(find build_dir/ -type d -name "linux-mediatek_filogic" | head -n 1)
-          cd "$KBUILD_DIR"
-
-          echo "Step 2: Creating a new patch for 8GB RAM..."
-          # Мы убрали 'quilt setup' и 'push'
-          quilt new 999-bpi-r4-add-8gb-ram-support.patch
-          DTSI_FILE=$(find . -type f -name "mt7988a-bananapi-bpi-r4.dtsi")
-          quilt add "$DTSI_FILE"
-
-          echo "Step 3: Modifying the DTSi file..."
-          sed -i '/memory@40000000 {/,/};/c\
-          memory@40000000 {\
-              device_type = "memory";\
-              reg = <0x0 0x40000000 0x2 0x00000000>;\
-          };' "$DTSI_FILE"
-
-          echo "Step 4: Finalizing the patch..."
-          quilt refresh
-          
-          echo "Patch created successfully. Going back to root..."
-          cd -
-
-      - name: Clean kernel for repatching
-        run: |
-          echo "Cleaning previous kernel build to ensure patch is applied..."
-          make target/linux/clean -j$(nproc) V=s
-
       - name: Build the firmware image
         run: |
           make defconfig
           make download -j$(nproc) || true
-          make world -j$(nproc) V=s
+          make world -j$(nproc)
+
+      - name: Patch the generated image with 8GB bl2
+        run: |
+          echo "Finding and unpacking the generated SD card image..."
+          IMAGE_DIR="bin/targets/mediatek/filogic"
+          GZ_IMAGE_FILE=$(find "$IMAGE_DIR" -name "*sdcard.img.gz")
+          gunzip -f "$GZ_IMAGE_FILE"
+          IMAGE_FILE="${GZ_IMAGE_FILE%.gz}"
+
+          echo "Fetching the LATEST 8GB bl2 from Frank-w's releases via GitHub API..."
+          
+          LATEST_RELEASE_INFO=$(curl -s "https://api.github.com/repos/frank-w/u-boot/releases/latest")
+          
+          BL2_DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name == "bpi-r4_sdmmc_8GB_bl2.img") | .browser_download_url')
+
+          if [ -z "$BL2_DOWNLOAD_URL" ] || [ "$BL2_DOWNLOAD_URL" == "null" ]; then
+            echo "::error::Could not find 'bpi-r4_sdmmc_8GB_bl2.img' in the latest release!"
+            exit 1
+          fi
+          
+          echo "Found download URL: $BL2_DOWNLOAD_URL"
+          
+          wget -O bpi-r4_sdmmc_8GB_bl2.img "$BL2_DOWNLOAD_URL"
+          
+          echo "Patching the image using dd with fixed offset (17408 bytes)..."
+          # Смещение 17408 байт = 34 сектора * 512 байт/сектор
+          OFFSET=17408
+          
+          dd if=bpi-r4_sdmmc_8GB_bl2.img of="$IMAGE_FILE" bs=1 seek="$OFFSET" conv=notrunc
+          
+          echo "Repacking the patched image..."
+          gzip -f9 "$IMAGE_FILE"
+
+          echo "Image successfully patched."
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
