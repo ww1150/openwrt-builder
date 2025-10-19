@@ -160,8 +160,6 @@ CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
 CONFIG_PACKAGE_kmod-usb-serial-option=y
 CONFIG_PACKAGE_kmod-usb-serial-qualcomm=y
 CONGIG_PACKAGE_kmod-usb-net-cdc-mbim=y
-CONFIG_PACKAGE_luci-proto-qmi=y
-CONFIG_PACKAGE_luci-proto-modemmanager=y
 
 CONFIG_ALL_KMODS=y
 CONFIG_ALL_NONSHARED=y
