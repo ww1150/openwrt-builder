@@ -160,39 +160,37 @@ jobs:
 
       - name: Patch the generated image with 8GB bl2
         run: |
-          echo "Step 1: Finding and unpacking the generated SD card image..."
-          IMAGE_DIR=$(find bin/targets/mediatek/filogic -type d)
+          echo "Finding and unpacking the generated SD card image..."
+          IMAGE_DIR="bin/targets/mediatek/filogic"
           GZ_IMAGE_FILE=$(find "$IMAGE_DIR" -name "*sdcard.img.gz")
           gunzip -f "$GZ_IMAGE_FILE"
           IMAGE_FILE="${GZ_IMAGE_FILE%.gz}"
 
-          echo "Step 2: Downloading the 8GB bl2..."
-          wget https://github.com/frank-w/u-boot/releases/download/CI-BUILD-2025-10-bpi-2025-10-13_1707/bpi-r4_sdmmc_8GB_bl2.img
+          echo "Fetching the LATEST 8GB bl2 from Frank-w's releases via GitHub API..."
+          
+          LATEST_RELEASE_INFO=$(curl -s "https://api.github.com/repos/frank-w/u-boot/releases/latest")
+          
+          BL2_DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name == "bpi-r4_sdmmc_8GB_bl2.img") | .browser_download_url')
 
-          echo "Step 3: Patching the image using a loop device (requires sudo)..."
+          if [ -z "$BL2_DOWNLOAD_URL" ] || [ "$BL2_DOWNLOAD_URL" == "null" ]; then
+            echo "::error::Could not find 'bpi-r4_sdmmc_8GB_bl2.img' in the latest release!"
+            exit 1
+          fi
           
-          # Находим свободное loop-устройство
-          LOOP_DEV=$(sudo losetup -f)
+          echo "Found download URL: $BL2_DOWNLOAD_URL"
           
-          echo "Associating $IMAGE_FILE with $LOOP_DEV..."
-          # Подключаем образ как loop-устройство с поиском разделов
-          sudo losetup --partscan "$LOOP_DEV" "$IMAGE_FILE"
+          wget -O bpi-r4_sdmmc_8GB_bl2.img "$BL2_DOWNLOAD_URL"
           
-          # Ждем, пока узлы разделов появятся в /dev
-          sleep 2
+          echo "Patching the image using dd with fixed offset (17408 bytes)..."
+          # Смещение 17408 байт = 34 сектора * 512 байт/сектор
+          OFFSET=17408
           
-          # Записываем bl2 ТОЧНО в первый раздел
-          echo "Writing 8GB bl2 to ${LOOP_DEV}p1..."
-          sudo dd if=bpi-r4_sdmmc_8GB_bl2.img of="${LOOP_DEV}p1" conv=notrunc,fsync
+          dd if=bpi-r4_sdmmc_8GB_bl2.img of="$IMAGE_FILE" bs=1 seek="$OFFSET" conv=notrunc
           
-          echo "Detaching loop device..."
-          # Отключаем loop-устройство
-          sudo losetup -d "$LOOP_DEV"
-          
-          echo "Step 4: Repacking the patched image..."
+          echo "Repacking the patched image..."
           gzip -f9 "$IMAGE_FILE"
 
-          echo "Image successfully patched. Balena Etcher should now accept it."
+          echo "Image successfully patched."
 
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
