@@ -49,8 +49,7 @@ fi
 PACKAGES="collectd collectd-mod-sensors \
 collectd-mod-dns collectd-mod-wireless collectd-mod-ping \
 luci-app-statistics luci htop curl owut \
-irqbalance luci-app-irqbalance \
-wifi-scripts"
+irqbalance luci-app-irqbalance "
 
 # additional
 # fping kmod-crypto-user kmod-cryptodev
@@ -78,7 +77,7 @@ fi
 if [[ "$DEVICE" =~ Main|main ]]; then
     PACKAGES="$PACKAGES ddns-scripts luci-app-ddns"
     PACKAGES="$PACKAGES luci-proto-wireguard kmod-wireguard wireguard-tools qrencode"
-    PACKAGES="$PACKAGES tc-full pciutils"
+    PACKAGES="$PACKAGES tc-full pciutils kmod-phy-aquantia"
     if [ -n "$SQM_TOOL" ]; then
         PACKAGES="$PACKAGES $SQM_TOOL"
     fi
