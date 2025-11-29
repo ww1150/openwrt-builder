@@ -164,3 +164,6 @@ CONGIG_PACKAGE_kmod-usb-net-cdc-mbim=y
 CONFIG_ALL_KMODS=y
 CONFIG_ALL_NONSHARED=y
 CONFIG_AUTOREMOVE=y
+
+# For tailscail/zerotier
+CONFIG_PACKAGE_kmod-tun=y
