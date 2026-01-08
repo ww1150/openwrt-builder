@@ -134,16 +134,28 @@ jobs:
         run: |
           make defconfig
 
-      - name: Increase Image Size Limit
-        run: |
-          # Увеличиваем лимит с 44МБ до 100МБ (102400k), так как на SD карте места много
-          sed -i 's/IMAGE_SIZE := 45056k/IMAGE_SIZE := 102400k/g' target/linux/mediatek/image/filogic.mk
-          # На всякий случай проверяем, применилось ли (для логов)
-          grep "IMAGE_SIZE :=" target/linux/mediatek/image/filogic.mk | grep bananapi_bpi-r4 -A 5 || true
-
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
+
+      - name: Patch Image Layout Limits
+        run: |
+          # Переходим в папку с описанием образов
+          IMAGE_MK="target/linux/mediatek/image/filogic.mk"
+          
+          # Заменяем проверку размера с 44м на 100м
+          sed -i 's/check-size 44m/check-size 100m/g' $IMAGE_MK
+          
+          # Заменяем отступ (padding) с 44M на 100M
+          # Это самое важное, так как это расширяет место под саму прошивку
+          sed -i 's/pad-to 44M/pad-to 100M/g' $IMAGE_MK
+          sed -i 's/pad-to 44m/pad-to 100m/g' $IMAGE_MK
+          
+          # На всякий случай увеличим размер раздела в конфиге
+          echo "CONFIG_TARGET_ROOTFS_PARTSIZE=512" >> .config
+
+          echo "Verification after patching:"
+          grep -E "check-size 100m|pad-to 100M" $IMAGE_MK
 
       - name: Build the firmware image
         run: |
