@@ -134,6 +134,13 @@ jobs:
         run: |
           make defconfig
 
+      - name: Increase Image Size Limit
+        run: |
+          # Увеличиваем лимит с 44МБ до 100МБ (102400k), так как на SD карте места много
+          sed -i 's/IMAGE_SIZE := 45056k/IMAGE_SIZE := 102400k/g' target/linux/mediatek/image/filogic.mk
+          # На всякий случай проверяем, применилось ли (для логов)
+          grep "IMAGE_SIZE :=" target/linux/mediatek/image/filogic.mk | grep bananapi_bpi-r4 -A 5 || true
+
       - name: Remove packages that are marked as modules
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
