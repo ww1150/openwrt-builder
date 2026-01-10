@@ -157,42 +157,11 @@ jobs:
           echo "Verification after patching:"
           grep -E "check-size 100m|pad-to 100M" $IMAGE_MK
 
-      - name: Inject Wi-Fi 7 EEPROM and UCI defaults
+      - name: Apply mt7996 tx_power fix patch
         run: |
-          # 1. Создаем структуру папок для прошивки
-          mkdir -p files/lib/firmware/mediatek/mt7996/
-          mkdir -p files/etc/uci-defaults/
-
-          # 2. Скачиваем ПРАВИЛЬНЫЙ калиброванный EEPROM (BE14/233)
-          # Этот файл заполнит те самые "zeros", о которых ругается dmesg
-          curl -SL https://github.com/frank-w/BPI-Router-Images/raw/main/files/lib/firmware/mediatek/mt7996/mt7996_eeprom_233_2i5i6i.bin > files/lib/firmware/mediatek/mt7996/mt7996_eeprom_233_2i5i6i.bin
-          
-          # Делаем ссылки, чтобы драйвер точно нашел файл
-          ln -sf mt7996_eeprom_233_2i5i6i.bin files/lib/firmware/mediatek/mt7996/mt7996_eeprom_233.bin
-          ln -sf mt7996_eeprom_233_2i5i6i.bin files/lib/firmware/mediatek/mt7996/mt7996_eeprom.bin
-
-          # 3. Создаем скрипт автонастройки Wi-Fi 7 для Xiaomi
-          cat <<EOF > files/etc/uci-defaults/99-wifi7-config
-          #!/bin/sh
-          # Настройка 5ГГц (radio1)
-          uci set wireless.radio1.htmode='EHT160'
-          uci set wireless.default_radio1.ieee80211be='1'
-          uci set wireless.default_radio1.encryption='sae'
-          uci set wireless.default_radio1.mlo='1'
-
-          # Настройка 6ГГц (radio2)
-          uci set wireless.radio2.htmode='EHT320'
-          uci set wireless.radio2.channel='37'
-          uci set wireless.default_radio2.ieee80211be='1'
-          uci set wireless.default_radio2.encryption='sae'
-          uci set wireless.default_radio2.mlo='1'
-
-          uci commit wireless
-          exit 0
-          EOF
-          chmod +x files/etc/uci-defaults/99-wifi7-config
-
-          echo "EEPROM and WiFi 7 configs successfully injected."
+          mkdir -p package/kernel/mt76/patches/
+          wget -O package/kernel/mt76/patches/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch \
+          https://raw.githubusercontent.com/immortalwrt/immortalwrt/master/package/kernel/mt76/patches/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch
 
       - name: Build the firmware image
         run: |
