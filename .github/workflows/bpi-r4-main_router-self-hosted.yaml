@@ -157,11 +157,61 @@ jobs:
           echo "Verification after patching:"
           grep -E "check-size 100m|pad-to 100M" $IMAGE_MK
 
-      - name: Apply mt7996 tx_power fix patch
+      - name: Force patch mt7996 via sed
         run: |
-          mkdir -p package/kernel/mt76/patches/
-          wget -O package/kernel/mt76/patches/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch \
-          https://raw.githubusercontent.com/immortalwrt/immortalwrt/master/package/kernel/mt76/patches/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch
+          # 1. Распаковываем исходники драйвера mt76, чтобы они появились в build_dir
+          make package/kernel/mt76/prepare V=s
+          
+          # 2. Находим путь к файлу eeprom.c (он может отличаться в разных билдах)
+          FILE=$(find build_dir/ -name "mt7996/eeprom.c" | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "::error::eeprom.c не найден! Проверьте структуру build_dir."
+            exit 1
+          fi
+          echo "Патчим файл: $FILE"
+          
+          # 3. Создаем временный файл с кодом функции fixup
+          cat <<EOF > fixup_func.c
+          static void
+          mt7996_eeprom_fixup_tx_power(struct mt7996_dev *dev, const u8 *def)
+          {
+            u8 *eeprom = dev->mt76.eeprom.data;
+            int i;
+            bool zeros_detected = false;
+            
+            if (!eeprom[ MT_EE_TX0_POWER_2G ]) {
+            eeprom[ MT_EE_TX0_POWER_2G ] = def[ MT_EE_TX0_POWER_2G ];
+            zeros_detected = true;
+          }
+            
+            for (i = MT_EE_TX0_POWER_5G; i < MT_EE_TX0_POWER_5G + 5; ++i) {
+            if (!eeprom[ i ]) {
+            eeprom[ i ] = def[ i ];
+            zeros_detected = true;
+          }
+          }
+            
+            for (i = MT_EE_TX0_POWER_6G; i < MT_EE_TX0_POWER_6G + 8; ++i) {
+            if (!eeprom[ i ]) {
+            eeprom[ i ] = def[ i ];
+            zeros_detected = true;
+          }
+          }
+            
+            if (zeros_detected)
+            dev_warn(dev->mt76.dev, "eeprom tx_power zeros detected, using defaults\n");
+          }
+    
+          EOF
+        
+          # 4. Вставляем функцию ПЕРЕД mt7996_eeprom_variant_valid
+          sed -i '/static bool mt7996_eeprom_variant_valid/r fixup_func.c' "$FILE"
+          
+          # 5. Вставляем вызов функции внутрь mt7996_eeprom_check_or_use_default
+          # Ищем строку с вызовом mt7996_eeprom_variant_valid и вставляем наш вызов перед ней
+          sed -i '/mt7996_eeprom_variant_valid(dev, fw->data))/i \	mt7996_eeprom_fixup_tx_power(dev, fw->data);' "$FILE"
+          
+          echo "Sed патч успешно применен."
 
       - name: Build the firmware image
         run: |
