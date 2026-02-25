@@ -173,7 +173,7 @@ jobs:
 
           echo "Fetching the LATEST 8GB bl2 from Frank-w's releases via GitHub API..."
           
-          LATEST_RELEASE_INFO=$(curl -s "https://api.github.com/repos/frank-w/u-boot/releases/latest")
+          LATEST_RELEASE_INFO=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/frank-w/u-boot/releases/latest")
           
           BL2_DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name == "bpi-r4_sdmmc_8GB_bl2.img") | .browser_download_url')
 
