@@ -164,6 +164,8 @@ jobs:
           make world -j$(nproc)
 
       - name: Patch the generated image with 8GB bl2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Finding and unpacking the generated SD card image..."
           IMAGE_DIR="bin/targets/mediatek/filogic"
