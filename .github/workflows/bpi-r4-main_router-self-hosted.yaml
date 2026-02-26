@@ -56,6 +56,8 @@ jobs:
       - name: Add custom feeds
         run: |
           echo 'src-git zapret https://github.com/remittor/zapret-openwrt.git' >> feeds.conf.default
+          echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
+          echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main' >> feeds.conf.default
 
       - name: Clone single packages
         run: |
@@ -92,6 +94,10 @@ jobs:
         run: |
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
+
+      - name: Enable PassWall2
+        run: |
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/passwall2 >> .config
 
       #      - name: Add patches for 4GB WED
       #        run: |

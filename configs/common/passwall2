@@ -1,0 +1,6 @@
+# PassWall2 - VLESS/proxy client with LuCI UI
+CONFIG_PACKAGE_luci-app-passwall2=y
+CONFIG_PACKAGE_luci-i18n-passwall2-ru=y
+
+# Xray backend
+CONFIG_PACKAGE_xray-core=y
