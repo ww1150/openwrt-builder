@@ -55,13 +55,13 @@ jobs:
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
       - name: Checkout current repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: "custom_repo"
 
@@ -94,7 +94,7 @@ jobs:
         run: tar -cvf ax_3600-images.tar bin/targets/qualcommax/ipq807x
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ax_3600-images
           path: ax_3600-images.tar
@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ax_3600-images
       - name: Extract artifacts

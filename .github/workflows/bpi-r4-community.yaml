@@ -28,7 +28,7 @@ jobs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -55,7 +55,7 @@ jobs:
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -99,7 +99,7 @@ jobs:
         run: cp .config  bin/targets/mediatek/filogic/config-full
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bpi_r4-images
           path: bpi_r4-images.tar
@@ -111,7 +111,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: bpi_r4-images
 
