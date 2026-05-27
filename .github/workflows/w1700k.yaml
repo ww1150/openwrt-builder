@@ -77,6 +77,11 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
+      - name: Ensure realtek drivers are enabled
+        run: |
+          sed -i 's/# CONFIG_PACKAGE_kmod-phy-realtek is not set/CONFIG_PACKAGE_kmod-phy-realtek=y/g' .config;
+          sed -i 's/# CONFIG_PACKAGE_rtl8261n-firmware is not set/CONFIG_PACKAGE_rtl8261n-firmware=y/g' .config ;
+
       - name: Build the firmware image
         run: make -j $(nproc) defconfig download world
 
