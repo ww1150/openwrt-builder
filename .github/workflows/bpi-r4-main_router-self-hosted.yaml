@@ -21,7 +21,7 @@ jobs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -48,22 +48,22 @@ jobs:
       #          sudo apt full-upgrade -y
 
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
 
       - name: Add custom feeds
         run: |
-          echo 'src-git zapret https://github.com/remittor/zapret-openwrt.git' >> feeds.conf.default
+          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git^124c9f7983dcd6fddf46d3e863fc67853017c4fd' >> feeds.conf.default
           echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
-          echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main' >> feeds.conf.default
+          echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3' >> feeds.conf.default
 
       - name: Clone single packages
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-      - name: Update and install feeds (with fallback to GitHub mirrors)
+      - name: Update feeds (with fallback to GitHub mirrors)
         run: |
           if ./scripts/feeds update -a; then
             echo "Successfully updated feeds from official sources."
@@ -76,8 +76,16 @@ jobs:
             ./scripts/feeds update -a
           fi
 
-          echo "Feeds updated successfully. Now installing all packages."
-          ./scripts/feeds install -a
+      - name: Patch custom feeds
+        run: |
+          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/998-zapret2-v1.0.4.patch |
+            patch --batch --forward -d feeds/zapret2 -p1
+          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/999-passwall2-ignore-wan6-ifup-restart.patch |
+            patch --batch --forward -d feeds/passwall2 -p1
+          ./scripts/feeds update -i zapret2 passwall2
+
+      - name: Install feeds
+        run: ./scripts/feeds install -a
 
       - name: Configure firmware image
         run: |
@@ -85,6 +93,7 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/sfp >> .config
 
       - name: Enable MLO
         run: |
@@ -119,12 +128,6 @@ jobs:
 
       #
       ### EEPROM FIX ###
-      #
-      ## https://github.com/openwrt/mt76/pull/954
-      - name: Use patch from Yukariin
-        run: |
-          mkdir -p package/kernel/mt76/patches
-          curl -SL https://github.com/openwrt/mt76/commit/8088940ffd047a6d282a95af829562e8038f5b2d.patch > package/kernel/mt76/patches/001-Add-tx_power-check-Yukariin.patch
       #
       ## https://github.com/openwrt/mt76/pull/968
       - name: Use patch from im-0
@@ -212,7 +215,7 @@ jobs:
         run: cp .config  bin/targets/mediatek/filogic/config-full
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bpi_r4-images
           path: bpi_r4-images.tar
@@ -224,7 +227,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: bpi_r4-images
 
