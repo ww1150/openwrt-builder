@@ -6,7 +6,7 @@ on:
 
 env:
   REMOTE_REPOSITORY: danpawlik/openwrt
-  REMOTE_BRANCH: w1700k-npu-no-balika
+  REMOTE_BRANCH: devel-mtk-feed
   RELEASE_PREFIX: airoha
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -43,7 +43,7 @@ jobs:
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -56,6 +56,10 @@ jobs:
       # NOTE: something seems to be not right after
       # https://github.com/openwrt/openwrt/compare/4d653973de0eb6254d7c343de58de9b632b26ebe..37ebcb6c22ea8ef410d1dd9604ae8a77340fe32c
       # Include removed packages.
+      # NOTE: Since https://github.com/openwrt/openwrt/pull/22151, we changed
+      # way to run the system. Now it would be using chainload.
+      # To bootstrap the router, see: https://github.com/hurrian/w1700k-ubi-installer
+      # then in the system, push the firmware and just do: sysupgrade --force firmware.bin
       - name: Configure firmware image
         run: |
           curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/airoha/an7581/gemtek_w1700k > .config ;
@@ -64,8 +68,6 @@ jobs:
           curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/mlo >> .config;
           curl -SL https://raw.githubusercontent.com/danpawlik/openwrt-builder/master/configs/common/optimize >> .config ;
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-phy-realtek=y" >> .config
-          echo "CONFIG_PACKAGE_rtl8261n-firmware=y" >> .config
 
       - name: Run defconfig
         run:
@@ -75,6 +77,11 @@ jobs:
         run: |
           grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
 
+      - name: Ensure realtek drivers are enabled
+        run: |
+          sed -i 's/# CONFIG_PACKAGE_kmod-phy-realtek is not set/CONFIG_PACKAGE_kmod-phy-realtek=y/g' .config;
+          sed -i 's/# CONFIG_PACKAGE_rtl8261n-firmware is not set/CONFIG_PACKAGE_rtl8261n-firmware=y/g' .config ;
+
       - name: Build the firmware image
         run: make -j $(nproc) defconfig download world
 
@@ -82,7 +89,7 @@ jobs:
         run: tar -cvf W1700k.tar bin/targets/airoha/an7581
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: W1700k
           path: W1700k.tar
@@ -94,7 +101,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: W1700k
       - name: Extract artifacts
@@ -108,9 +115,9 @@ jobs:
         with:
           files: bin/targets/airoha/an7581/*
           tag_name: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-${{ env.RELEASE_DATE }}
-          name: OpenWrt Quantum Fiber W1700k - vanila - ${{ env.REMOTE_BRANCH }} - ${{ env.RELEASE_DATE }}
+          name: OpenWrt Quantum Fiber W1700k - 6.18 with few features - ${{ env.REMOTE_BRANCH }} - ${{ env.RELEASE_DATE }}
           body: |
-            Updated prebuilt images for ${{ env.RELEASE_DATE }}
+            Updated prebuilt images for ${{ env.RELEASE_DATE }} base on kernel 6.18
             Build Commit: ${{ needs.check_commits.outputs.latest_commit_sha }}
 
       - name: Clean up old releases
