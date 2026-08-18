@@ -21,7 +21,7 @@ jobs:
       latest_commit_sha: ${{ steps.get_sha.outputs.latest_commit_sha }}
     steps:
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -48,7 +48,7 @@ jobs:
           sudo apt full-upgrade -y
 
       - name: Checkout remote repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
           ref: ${{ env.REMOTE_BRANCH }}
@@ -84,6 +84,7 @@ jobs:
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
           curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
+          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/sfp >> .config
 
       - name: Enable MLO
         run: |
@@ -109,8 +110,6 @@ jobs:
       #        run: |
       #          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/patches/999-use-proper-wed-reference-in-wed-kernel.patch > target/linux/mediatek/patches-6.12/999-use-proper-wed-reference-in-wed-kernel.patch
       #          curl -SL https://github.com/LorenzoBianconi/mt76/commit/92f22edf7fd119cde26218a7431919e4cdf1628e.patch > package/kernel/mt76/patches/999-use-proper-wed-reference-in-wed-mt76.patch
-
-
       #- name: Enable wolfssl
       #  run: |
       #    sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
@@ -190,7 +189,7 @@ jobs:
         run: cp .config  bin/targets/mediatek/filogic/config-full
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bpi_r4-images
           path: bpi_r4-images.tar
@@ -202,7 +201,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: bpi_r4-images
 
