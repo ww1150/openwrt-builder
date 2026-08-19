@@ -28,3 +28,23 @@ index c969936..4b0c89f 100755
 -			icount=$(busybox pgrep -f "$(echo $cmd_check)" | wc -l)
 +			cmd_pattern=$(printf '%s\n' "$cmd_check" | sed -e 's/[[:space:]]*$//' -e 's/[][\\.^$*+?(){}|]/\\&/g')
 +			icount=$(busybox pgrep -f "$cmd_pattern" | wc -l)
+diff --git a/luci-app-passwall2/luasrc/passwall2/util_hysteria2.lua b/luci-app-passwall2/luasrc/passwall2/util_hysteria2.lua
+index 2d557bc..40b7e9f 100644
+--- a/luci-app-passwall2/luasrc/passwall2/util_hysteria2.lua
++++ b/luci-app-passwall2/luasrc/passwall2/util_hysteria2.lua
+@@ -75,0 +76,3 @@ function gen_config(var)
++	local auth_password = node.auth_password or node.hysteria2_auth_password
++	local obfs_type = node.obfs_type or node.hysteria2_obfs_type
++	local obfs_password = node.obfs_password or node.hysteria2_obfs_password
+@@ -128,4 +131,4 @@ function gen_config(var)
+-		obfs = (node.hysteria2_obfs_type and node.hysteria2_obfs_password) and {
+-			type = node.hysteria2_obfs_type,
+-			[node.hysteria2_obfs_type] = {
+-				password = node.hysteria2_obfs_password
++		obfs = (obfs_type and obfs_password) and {
++			type = obfs_type,
++			[obfs_type] = {
++				password = obfs_password
+@@ -134 +137 @@ function gen_config(var)
+-		auth = node.hysteria2_auth_password,
++		auth = auth_password,
