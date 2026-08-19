@@ -1,0 +1,46 @@
+diff --git a/zapret2/Makefile b/zapret2/Makefile
+index 4c20bdd..c324fbd 100644
+--- a/zapret2/Makefile
++++ b/zapret2/Makefile
+@@ -9 +9 @@ PKG_VERSION:=0.9.20260307
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+@@ -362,0 +363 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
++	touch $${ZAPRET_DIR}/ipset/*.txt >/dev/null 2>&1
+diff --git a/luci-app-zapret2/Makefile b/luci-app-zapret2/Makefile
+index 10dcc8f..6967eb6 100644
+--- a/luci-app-zapret2/Makefile
++++ b/luci-app-zapret2/Makefile
+@@ -9 +9 @@ PKG_VERSION:=0.9.20260307
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+diff --git a/luci-app-zapret2/htdocs/luci-static/resources/view/zapret2/tools.js b/luci-app-zapret2/htdocs/luci-static/resources/view/zapret2/tools.js
+index 02f8af0..d8052aa 100644
+--- a/luci-app-zapret2/htdocs/luci-static/resources/view/zapret2/tools.js
++++ b/luci-app-zapret2/htdocs/luci-static/resources/view/zapret2/tools.js
+@@ -81,4 +81,3 @@ return baseclass.extend({
+-        object: 'luci',
+-        method: 'setInitAction',
+-        params: [ 'name', 'action' ],
+-        expect: { result: false }
++        object: 'rc',
++        method: 'init',
++        params: [ 'name', 'action' ]
+@@ -148,2 +147,2 @@ return baseclass.extend({
+-        return this.callInitAction(name, action).then(success => {
+-            if (!success) {
++        return this.callInitAction(name, action).then(result => {
++            if (result) {
+diff --git a/luci-app-zapret2/root/usr/share/rpcd/acl.d/luci-app-zapret2.json b/luci-app-zapret2/root/usr/share/rpcd/acl.d/luci-app-zapret2.json
+index 72bb121..3314eb0 100644
+--- a/luci-app-zapret2/root/usr/share/rpcd/acl.d/luci-app-zapret2.json
++++ b/luci-app-zapret2/root/usr/share/rpcd/acl.d/luci-app-zapret2.json
+@@ -26 +26 @@
+-				"luci": [ "getInitList", "setInitAction" ],
++				"luci": [ "getInitList" ],
+@@ -37 +37,4 @@
+-			"uci": [ "zapret2" ]
++			"uci": [ "zapret2" ],
++			"ubus": {
++				"rc": [ "init" ]
++			}

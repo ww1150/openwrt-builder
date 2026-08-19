@@ -78,6 +78,8 @@ jobs:
 
       - name: Patch custom feeds
         run: |
+          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/996-zapret2-runtime-fixes.patch |
+            patch --batch --forward -d feeds/zapret2 -p1
           curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/997-passwall2-runtime-fixes.patch |
             patch --batch --forward -d feeds/passwall2 -p1
           curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/999-passwall2-ignore-wan6-ifup-restart.patch |
