@@ -1,0 +1,30 @@
+diff --git a/luci-app-passwall2/root/usr/share/passwall2/app.sh b/luci-app-passwall2/root/usr/share/passwall2/app.sh
+index 81baf88..79b796c 100755
+--- a/luci-app-passwall2/root/usr/share/passwall2/app.sh
++++ b/luci-app-passwall2/root/usr/share/passwall2/app.sh
+@@ -4,0 +5,2 @@
++umask 077
++
+diff --git a/luci-app-passwall2/root/usr/share/passwall2/monitor.sh b/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
+index e072465..c60e434 100755
+--- a/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
++++ b/luci-app-passwall2/root/usr/share/passwall2/monitor.sh
+@@ -21 +21,2 @@ while [ "$ENABLED" -eq 1 ]; do
+-			icount=$(busybox pgrep -f "$(echo $cmd_check)" | wc -l)
++			cmd_pattern=$(printf '%s\n' "$cmd_check" | sed -e 's/[[:space:]]*$//' -e 's/[][\\.^$*+?(){}|]/\\&/g')
++			icount=$(busybox pgrep -f "$cmd_pattern" | wc -l)
+diff --git a/luci-app-passwall2/root/usr/share/passwall2/nftables.sh b/luci-app-passwall2/root/usr/share/passwall2/nftables.sh
+index eaf5641..d041c62 100755
+--- a/luci-app-passwall2/root/usr/share/passwall2/nftables.sh
++++ b/luci-app-passwall2/root/usr/share/passwall2/nftables.sh
+@@ -554 +554 @@ load_acl() {
+-				add_shunt_t_rule "${SHUNT_LIST6}" "nft add rule $NFTABLE_NAME PSW2_MANGLE_V6 meta l4proto tcp $(factor $TCP_REDIR_PORTS "tcp dport") ip6 daddr" "${nft_j}" "${comment}"
++				add_shunt_t_rule "${SHUNT_LIST6}" "nft add rule $NFTABLE_NAME PSW2_MANGLE_V6 meta l4proto tcp $(factor $TCP_REDIR_PORTS "tcp dport") ip6 daddr" "counter jump PSW2_RULE" "${comment}"
+diff --git a/luci-app-passwall2/root/usr/share/passwall2/utils.sh b/luci-app-passwall2/root/usr/share/passwall2/utils.sh
+index c969936..4b0c89f 100755
+--- a/luci-app-passwall2/root/usr/share/passwall2/utils.sh
++++ b/luci-app-passwall2/root/usr/share/passwall2/utils.sh
+@@ -419 +419,2 @@ run_process_queue() {
+-			icount=$(busybox pgrep -f "$(echo $cmd_check)" | wc -l)
++			cmd_pattern=$(printf '%s\n' "$cmd_check" | sed -e 's/[[:space:]]*$//' -e 's/[][\\.^$*+?(){}|]/\\&/g')
++			icount=$(busybox pgrep -f "$cmd_pattern" | wc -l)

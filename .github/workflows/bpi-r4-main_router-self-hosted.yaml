@@ -55,7 +55,7 @@ jobs:
 
       - name: Add custom feeds
         run: |
-          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git^124c9f7983dcd6fddf46d3e863fc67853017c4fd' >> feeds.conf.default
+          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git;master' >> feeds.conf.default
           echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
           echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3' >> feeds.conf.default
 
@@ -78,8 +78,8 @@ jobs:
 
       - name: Patch custom feeds
         run: |
-          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/998-zapret2-v1.0.4.patch |
-            patch --batch --forward -d feeds/zapret2 -p1
+          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/997-passwall2-runtime-fixes.patch |
+            patch --batch --forward -d feeds/passwall2 -p1
           curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/999-passwall2-ignore-wan6-ifup-restart.patch |
             patch --batch --forward -d feeds/passwall2 -p1
           ./scripts/feeds update -i zapret2 passwall2
