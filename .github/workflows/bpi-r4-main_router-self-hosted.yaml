@@ -4,6 +4,10 @@ name: self-hosted BPI-R4 + main_router packages + GCC15 + 8G RAM
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 env:
   #
   #REMOTE_REPOSITORY: ww1150/openwrt
@@ -51,11 +55,17 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: ${{ env.REMOTE_REPOSITORY }}
-          ref: ${{ env.REMOTE_BRANCH }}
+          ref: ${{ needs.check_commits.outputs.latest_commit_sha }}
+
+      - name: Checkout builder configuration
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: builder
 
       - name: Add custom feeds
         run: |
-          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git;master' >> feeds.conf.default
+          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git^124c9f7983dcd6fddf46d3e863fc67853017c4fd' >> feeds.conf.default
           echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
           echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3' >> feeds.conf.default
 
@@ -78,12 +88,9 @@ jobs:
 
       - name: Patch custom feeds
         run: |
-          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/996-zapret2-runtime-fixes.patch |
-            patch --batch --forward -d feeds/zapret2 -p1
-          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/997-passwall2-runtime-fixes.patch |
-            patch --batch --forward -d feeds/passwall2 -p1
-          curl --fail -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/${{ github.sha }}/patches/999-passwall2-ignore-wan6-ifup-restart.patch |
-            patch --batch --forward -d feeds/passwall2 -p1
+          patch --batch --forward --fuzz=0 -d feeds/zapret2 -p1 < builder/patches/996-zapret2-runtime-fixes.patch
+          patch --batch --forward --fuzz=0 -d feeds/passwall2 -p1 < builder/patches/997-passwall2-runtime-fixes.patch
+          patch --batch --forward --fuzz=0 -d feeds/passwall2 -p1 < builder/patches/999-passwall2-ignore-wan6-ifup-restart.patch
           ./scripts/feeds update -i zapret2 passwall2
 
       - name: Install feeds
@@ -91,24 +98,21 @@ jobs:
 
       - name: Configure firmware image
         run: |
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/mediatek/mt7988a/bpi-r4 > .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/main-router >> .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/snapshot >> .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize >> .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/sfp >> .config
+          cat builder/configs/mediatek/mt7988a/bpi-r4 > .config
+          cat builder/configs/common/{main-router,snapshot,optimize,sfp} >> .config
 
       - name: Enable MLO
         run: |
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/mlo >> .config
+          cat builder/configs/common/mlo >> .config
 
       - name: Enable openssl
         run: |
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/openssl >> .config
+          cat builder/configs/common/openssl >> .config
 
       - name: Enable PassWall2
         run: |
-          curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/passwall2 >> .config
+          cat builder/configs/common/passwall2 >> .config
 
       #      - name: Add patches for 4GB WED
       #        run: |
@@ -135,7 +139,7 @@ jobs:
       - name: Use patch from im-0
         run: |
           mkdir -p package/kernel/mt76/patches
-          curl -SL https://github.com/openwrt/mt76/commit/aaf90b24fde77a38ee9f0a60d7097ded6a94ad1f.patch > package/kernel/mt76/patches/001-use-tx_power-from-default-fw-if-EEPROM-contains-0s-im-0.patch
+          curl --fail -SL https://github.com/openwrt/mt76/commit/aaf90b24fde77a38ee9f0a60d7097ded6a94ad1f.patch > package/kernel/mt76/patches/001-use-tx_power-from-default-fw-if-EEPROM-contains-0s-im-0.patch
 
       - name: Add librespeed-go
         run: |
@@ -180,13 +184,14 @@ jobs:
         run: |
           echo "Finding and unpacking the generated SD card image..."
           IMAGE_DIR="bin/targets/mediatek/filogic"
-          GZ_IMAGE_FILE=$(find "$IMAGE_DIR" -name "*sdcard.img.gz")
+          GZ_IMAGE_FILE="$IMAGE_DIR/openwrt-mediatek-filogic-bananapi_bpi-r4-sdcard.img.gz"
+          test -s "$GZ_IMAGE_FILE"
           gunzip -f "$GZ_IMAGE_FILE"
           IMAGE_FILE="${GZ_IMAGE_FILE%.gz}"
 
           echo "Fetching the LATEST 8GB bl2 from Frank-w's releases via GitHub API..."
           
-          LATEST_RELEASE_INFO=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/frank-w/u-boot/releases/latest")
+          LATEST_RELEASE_INFO=$(curl --fail -sS -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/frank-w/u-boot/releases/latest")
           
           BL2_DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name == "bpi-r4_sdmmc_8GB_bl2.img") | .browser_download_url')
 
@@ -198,6 +203,10 @@ jobs:
           echo "Found download URL: $BL2_DOWNLOAD_URL"
           
           wget -O bpi-r4_sdmmc_8GB_bl2.img "$BL2_DOWNLOAD_URL"
+          # BL2 must fit before the ubootenv partition at 4 MiB.
+          BL2_SIZE=$(stat -c %s bpi-r4_sdmmc_8GB_bl2.img)
+          test "$BL2_SIZE" -gt 0
+          test "$BL2_SIZE" -le $((4 * 1024 * 1024 - 17408))
           
           echo "Patching the image using dd with fixed offset (17408 bytes)..."
           # Смещение 17408 байт = 34 сектора * 512 байт/сектор
@@ -210,11 +219,19 @@ jobs:
 
           echo "Image successfully patched."
 
+      - name: Record config and final image checksums
+        run: |
+          cp .config bin/targets/mediatek/filogic/config-full
+          # The SD image was modified after OpenWrt generated sha256sums.
+          (
+            cd bin/targets/mediatek/filogic
+            find . -maxdepth 1 -type f ! -name sha256sums -print0 |
+              sort -z | xargs -0 sha256sum > sha256sums
+            sha256sum -c sha256sums
+          )
+
       - name: Package output
         run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
-
-      - name: Add config file
-        run: cp .config  bin/targets/mediatek/filogic/config-full
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
