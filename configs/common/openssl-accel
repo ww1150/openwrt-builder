@@ -1,0 +1,4 @@
+# Append after configs/common/openssl.
+# Userspace speed opts only — OpenSSL on ARMv8 already uses CPU AES (CE).
+
+CONFIG_OPENSSL_OPTIMIZE_SPEED=y

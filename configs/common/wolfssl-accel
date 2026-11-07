@@ -1,0 +1,5 @@
+# Append after configs/common/wolfssl.
+# CPU AES only (ARMv8 CE / AES-NI / RISC-V). Otherwise keep libwolfssl.
+
+CONFIG_PACKAGE_libwolfsslcpu-crypto=y
+# CONFIG_PACKAGE_libwolfssl is not set

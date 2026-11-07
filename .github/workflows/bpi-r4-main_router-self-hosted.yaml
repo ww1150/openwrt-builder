@@ -33,8 +33,8 @@ jobs:
       - name: Get the latest commit SHA
         id: get_sha
         run: |
-          echo "latest_commit_sha=$(git rev-parse HEAD)" >> $GITHUB_ENV
-          echo "latest_commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "latest_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "latest_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build OpenWRT for BPI-R4 with BE14 and main-router packages
@@ -109,6 +109,7 @@ jobs:
         run: |
           sed -i '/CONFIG_PACKAGE_wpad-mbedtls=y/d' .config
           cat builder/configs/common/openssl >> .config
+          cat builder/configs/common/openssl-accel >> .config
 
       - name: Enable PassWall2
         run: |
@@ -151,7 +152,7 @@ jobs:
 
       - name: Remove packages that are marked as modules
         run: |
-          grep "=m" .config | grep -v 'CONFIG_PACKAGE_libustream-mbedtls=m' | while read -r line; do module=$(echo "$line" | cut -f1 -d'='); sed -i "s/^$line$/# $module is not set/" .config; done
+          sed -i -E '/^CONFIG_PACKAGE_libustream-mbedtls=m$/! s/^(CONFIG_[^=]+)=m$/# \1 is not set/' .config
 
       - name: Patch Image Layout Limits
         run: |
@@ -159,24 +160,24 @@ jobs:
           IMAGE_MK="target/linux/mediatek/image/filogic.mk"
           
           # Заменяем проверку размера с 44м на 100м
-          sed -i 's/check-size 44m/check-size 100m/g' $IMAGE_MK
+          sed -i 's/check-size 44m/check-size 100m/g' "$IMAGE_MK"
           
           # Заменяем отступ (padding) с 44M на 100M
           # Это самое важное, так как это расширяет место под саму прошивку
-          sed -i 's/pad-to 44M/pad-to 100M/g' $IMAGE_MK
-          sed -i 's/pad-to 44m/pad-to 100m/g' $IMAGE_MK
+          sed -i 's/pad-to 44M/pad-to 100M/g' "$IMAGE_MK"
+          sed -i 's/pad-to 44m/pad-to 100m/g' "$IMAGE_MK"
           
           # На всякий случай увеличим размер раздела в конфиге
           echo "CONFIG_TARGET_ROOTFS_PARTSIZE=512" >> .config
 
           echo "Verification after patching:"
-          grep -E "check-size 100m|pad-to 100M" $IMAGE_MK
+          grep -E "check-size 100m|pad-to 100M" "$IMAGE_MK"
 
       - name: Build the firmware image
         run: |
           make defconfig
-          make download -j$(nproc) || true
-          make world -j$(nproc)
+          make download -j"$(nproc)" || true
+          make world -j"$(nproc)"
 
       - name: Patch the generated image with 8GB bl2
         env:
@@ -231,13 +232,16 @@ jobs:
           )
 
       - name: Package output
-        run: tar -cvf bpi_r4-images.tar bin/targets/mediatek/filogic
+        run: tar -cvf bpi_r4-images.tar --exclude=packages --exclude=kernels bin/targets/mediatek/filogic
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
           name: bpi_r4-images
           path: bpi_r4-images.tar
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
 
   release:
     name: Create release
@@ -254,22 +258,24 @@ jobs:
         run: tar xf bpi_r4-images.tar
 
       - name: Get current date
-        run: echo "RELEASE_DATE=$(date +%F)" >> $GITHUB_ENV
+        run: echo "RELEASE_DATE=$(date +%F)" >> "$GITHUB_ENV"
 
       - name: Create release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v3.0.3
         with:
           files: bin/targets/mediatek/filogic/*
-          tag_name: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-${{ env.RELEASE_DATE }}
+          tag_name: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-${{ env.RELEASE_DATE }}-${{ github.run_id }}-${{ github.run_attempt }}
           name: OpenWRT BPI-R4 + MLO + main_router packages + GCC15 + 8G RAM - ${{ env.REMOTE_BRANCH }} - ${{ env.RELEASE_DATE }}
           body: |
             Updated prebuilt images with main_router packages, patches for working 4GB RAM WED build with GCC14 - ${{ env.RELEASE_DATE }},
             Build Commit: ${{ needs.check_commits.outputs.latest_commit_sha }}
+            Builder Commit: ${{ github.sha }}
 
       - name: Clean up old releases
         uses: dev-drprasad/delete-older-releases@master
         with:
           keep_latest: 5
           delete_tags: false
+          delete_tag_pattern: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
