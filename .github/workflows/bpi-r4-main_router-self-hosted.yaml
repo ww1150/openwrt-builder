@@ -155,7 +155,7 @@ jobs:
         env:
           OPENWRT_CCACHE: ${{ runner.tool_cache }}/openwrt-bpi-r4-ccache
         run: |
-          mkdir -p -m 700 "$OPENWRT_CCACHE"
+          install -d -m 700 -- "$OPENWRT_CCACHE"
           printf 'max_size = 5G\ncompiler_check = content\n' > "$OPENWRT_CCACHE/ccache.conf"
           {
             echo 'CONFIG_CCACHE=y'
