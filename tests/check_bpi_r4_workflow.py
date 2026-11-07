@@ -23,6 +23,7 @@ assert source.index("- name: Record config and final image checksums") < source.
 assert "cat builder/configs/common/openssl-accel >> .config" in source
 assert "delete_tag_pattern: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-" in source
 assert "${{ github.run_id }}-${{ github.run_attempt }}" in source
+assert 'make download -j"$(nproc)" || make download -j1 V=s' in source
 
 profile = (workflow.parents[2] / "configs/common/main-router").read_text()
 for package in ["block-mount", "e2fsprogs", "zapret2", "luci-app-zapret2", "dnsmasq-full", "netbird", "kmod-usb-net-cdc-mbim"]:
@@ -37,6 +38,8 @@ assert "CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO=y" not in openssl
 for name in ["cudy_ap3000.yaml", "u6lite.yaml"]:
     # The shared parents profile no longer selects full wpad on its own.
     assert "        common/mbedtls\n" in (workflow.parent / name).read_text()
+for name in ["bpi-r4-main_router.yaml", "_build-openwrt.yml"]:
+    assert step("Add ISL download mirror").strip() in (workflow.parent / name).read_text()
 
 for match in re.finditer(r"^        run: \|\n((?:          .*\n|\s*\n)+)", source, re.M):
     script = re.sub(r"\$\{\{.*?\}\}", "CHECK_VALUE", textwrap.dedent(match[1]))
@@ -46,6 +49,13 @@ with tempfile.TemporaryDirectory(prefix="bpi-r4-workflow-") as directory:
     root = Path(directory)
     output = root / "bin/targets/mediatek/filogic"
     output.mkdir(parents=True)
+    isl = root / "tools/isl/Makefile"
+    isl.parent.mkdir(parents=True)
+    original = "PKG_VERSION:=0.28\nPKG_SOURCE_URL:=https://libisl.sourceforge.io/\nPKG_HASH:=unchanged\n"
+    isl.write_text(original)
+    for _ in range(2):
+        subprocess.run(["bash", "-e", "-c", step("Add ISL download mirror")], cwd=root, check=True)
+    assert isl.read_text() == original.replace("PKG_SOURCE_URL:=", "PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl ")
     (root / ".config").write_text("CONFIG_PACKAGE_example=m\nCONFIG_PACKAGE_libustream-mbedtls=m\nCONFIG_OTHER=y\n")
     subprocess.run(["bash", "-e", "-c", step("Remove packages that are marked as modules")], cwd=root, check=True)
     assert (root / ".config").read_text() == "# CONFIG_PACKAGE_example is not set\nCONFIG_PACKAGE_libustream-mbedtls=m\nCONFIG_OTHER=y\n"

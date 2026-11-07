@@ -69,6 +69,9 @@ jobs:
           echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
           echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3' >> feeds.conf.default
 
+      - name: Add ISL download mirror
+        run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
+
       - name: Clone single packages
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
@@ -176,7 +179,7 @@ jobs:
       - name: Build the firmware image
         run: |
           make defconfig
-          make download -j"$(nproc)" || true
+          make download -j"$(nproc)" || make download -j1 V=s
           make world -j"$(nproc)"
 
       - name: Patch the generated image with 8GB bl2

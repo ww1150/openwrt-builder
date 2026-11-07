@@ -59,6 +59,9 @@ jobs:
         run: |
           echo 'src-git zapret https://github.com/remittor/zapret-openwrt.git' >> feeds.conf.default
 
+      - name: Add ISL download mirror
+        run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
+
       - name: Clone single packages
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
@@ -141,7 +144,7 @@ jobs:
       - name: Build the firmware image
         run: |
           make defconfig
-          make download -j"$(nproc)" || true
+          make download -j"$(nproc)" || make download -j1 V=s
           make world -j"$(nproc)"
 
       - name: Patch the generated image with 8GB bl2

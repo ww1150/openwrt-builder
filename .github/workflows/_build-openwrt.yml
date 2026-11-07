@@ -103,6 +103,10 @@ jobs:
         working-directory: openwrt
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Add ISL download mirror
+        working-directory: openwrt
+        run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
+
       - name: Free disk space
         # A full `world` build does not fit into the default ~14 GB of free space.
         run: |
@@ -195,7 +199,7 @@ jobs:
 
       - name: Download sources
         working-directory: openwrt
-        run: make -j"$(nproc)" download
+        run: make -j"$(nproc)" download || make -j1 V=s download
 
       - name: Build the firmware image
         working-directory: openwrt
