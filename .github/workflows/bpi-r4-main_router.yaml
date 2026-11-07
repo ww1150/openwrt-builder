@@ -62,6 +62,9 @@ jobs:
       - name: Add ISL download mirror
         run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
 
+      - name: Fix liblzo host tool dependencies
+        run: sed -i 's/^tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS),y) += liblzo$/tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS)$(BUILD_LZO_TOOLS),y) += liblzo/' tools/Makefile
+
       - name: Clone single packages
         run: |
           git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon

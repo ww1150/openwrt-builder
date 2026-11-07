@@ -43,6 +43,7 @@ for name in ["cudy_ap3000.yaml", "u6lite.yaml"]:
     assert "        common/mbedtls\n" in (workflow.parent / name).read_text()
 for name in ["bpi-r4-main_router.yaml", "_build-openwrt.yml"]:
     assert step("Add ISL download mirror").strip() in (workflow.parent / name).read_text()
+    assert step("Fix liblzo host tool dependencies").strip() in (workflow.parent / name).read_text()
 
 for match in re.finditer(r"^        run: \|\n((?:          .*\n|\s*\n)+)", source, re.M):
     script = re.sub(r"\$\{\{.*?\}\}", "CHECK_VALUE", textwrap.dedent(match[1]))
@@ -59,6 +60,34 @@ with tempfile.TemporaryDirectory(prefix="bpi-r4-workflow-") as directory:
     for _ in range(2):
         subprocess.run(["bash", "-e", "-c", step("Add ISL download mirror")], cwd=root, check=True)
     assert isl.read_text() == original.replace("PKG_SOURCE_URL:=", "PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl ")
+    tools = root / "tools/Makefile"
+    # Relevant upstream dependency rules: liblzo must enter tools-y before the loops.
+    tools.write_text(textwrap.dedent("""\
+        curdir:=tools
+        ifneq ($(CONFIG_SDK)$(CONFIG_TARGET_INITRAMFS_COMPRESSION_LZO),)
+        BUILD_LZO_TOOLS=y
+        endif
+        tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS),y) += liblzo
+        tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS)$(BUILD_LZO_TOOLS),y) += lzop
+        tools/liblzo/compile := tools/cmake/compile
+        tools/lzop/compile := tools/cmake/compile tools/liblzo/compile
+        ifneq ($(CONFIG_CCACHE)$(CONFIG_SDK),)
+        $(foreach tool,$(tools-y),$(eval tools/$(tool)/compile += tools/ccache/compile))
+        endif
+        .PHONY: report
+        report:
+        \t@echo '$(tools-y)|$(tools/liblzo/compile)'
+        """))
+    def lzo_dependencies(*settings):
+        return subprocess.check_output(["make", "--no-print-directory", "-f", str(tools), "report", *settings], cwd=root, text=True)
+
+    assert "tools/ccache/compile" not in lzo_dependencies("CONFIG_SDK=y", "CONFIG_CCACHE=y")
+    for _ in range(2):
+        subprocess.run(["bash", "-e", "-c", step("Fix liblzo host tool dependencies")], cwd=root, check=True)
+    for settings in [("CONFIG_SDK=y",), ("CONFIG_TARGET_INITRAMFS_COMPRESSION_LZO=y", "CONFIG_CCACHE=y"), ("CONFIG_BUILD_ALL_HOST_TOOLS=y", "CONFIG_CCACHE=y")]:
+        result = lzo_dependencies(*settings)
+        assert "liblzo" in result.split("|")[0] and "tools/ccache/compile" in result
+    assert lzo_dependencies().split("|")[0] == ""
     (root / ".config").write_text("CONFIG_PACKAGE_example=m\nCONFIG_PACKAGE_libustream-mbedtls=m\nCONFIG_OTHER=y\n")
     subprocess.run(["bash", "-e", "-c", step("Remove packages that are marked as modules")], cwd=root, check=True)
     assert (root / ".config").read_text() == "# CONFIG_PACKAGE_example is not set\nCONFIG_PACKAGE_libustream-mbedtls=m\nCONFIG_OTHER=y\n"

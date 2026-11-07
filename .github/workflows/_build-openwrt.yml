@@ -107,6 +107,10 @@ jobs:
         working-directory: openwrt
         run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
 
+      - name: Fix liblzo host tool dependencies
+        working-directory: openwrt
+        run: sed -i 's/^tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS),y) += liblzo$/tools-$(if $(CONFIG_BUILD_ALL_HOST_TOOLS)$(BUILD_LZO_TOOLS),y) += liblzo/' tools/Makefile
+
       - name: Free disk space
         # A full `world` build does not fit into the default ~14 GB of free space.
         run: |
