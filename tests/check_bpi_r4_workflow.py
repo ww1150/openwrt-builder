@@ -1,6 +1,7 @@
 """Run with python3 tests/check_bpi_r4_workflow.py (no network or dependencies)."""
 from pathlib import Path
 import re
+import os
 import subprocess
 import tarfile
 import tempfile
@@ -23,7 +24,9 @@ assert source.index("- name: Record config and final image checksums") < source.
 assert "cat builder/configs/common/openssl-accel >> .config" in source
 assert "delete_tag_pattern: ${{ env.RELEASE_PREFIX }}-${{ env.REMOTE_BRANCH }}-" in source
 assert "${{ github.run_id }}-${{ github.run_attempt }}" in source
-assert 'make download -j"$(nproc)" || make download -j1 V=s' in source
+assert 'make download -j8 || make download -j1 V=s' in source
+assert 'make world -j"$(nproc)"' in source
+assert '${{ runner.tool_cache }}/openwrt-bpi-r4-ccache' in source
 
 profile = (workflow.parents[2] / "configs/common/main-router").read_text()
 for package in ["block-mount", "e2fsprogs", "zapret2", "luci-app-zapret2", "dnsmasq-full", "netbird", "kmod-usb-net-cdc-mbim"]:
@@ -60,6 +63,10 @@ with tempfile.TemporaryDirectory(prefix="bpi-r4-workflow-") as directory:
     subprocess.run(["bash", "-e", "-c", step("Remove packages that are marked as modules")], cwd=root, check=True)
     assert (root / ".config").read_text() == "# CONFIG_PACKAGE_example is not set\nCONFIG_PACKAGE_libustream-mbedtls=m\nCONFIG_OTHER=y\n"
     (root / ".config").write_text("CONFIG_TARGET_mediatek=y\n")
+    cache = root / "persistent-ccache"
+    subprocess.run(["bash", "-e", "-c", step("Configure persistent compiler cache")], cwd=root, env=dict(os.environ, OPENWRT_CCACHE=str(cache)), check=True)
+    assert (cache / "ccache.conf").read_text() == "max_size = 5G\ncompiler_check = content\n"
+    assert (root / ".config").read_text() == f'CONFIG_TARGET_mediatek=y\nCONFIG_CCACHE=y\nCONFIG_CCACHE_DIR="{cache}"\n'
     for excluded in ["packages", "kernels"]:
         (output / excluded).mkdir()
         (output / excluded / "excluded.bin").write_bytes(b"not a firmware release asset")

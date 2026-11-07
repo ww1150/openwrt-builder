@@ -65,9 +65,11 @@ jobs:
 
       - name: Add custom feeds
         run: |
-          echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git^124c9f7983dcd6fddf46d3e863fc67853017c4fd' >> feeds.conf.default
-          echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main' >> feeds.conf.default
-          echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3' >> feeds.conf.default
+          {
+            echo 'src-git zapret2 https://github.com/remittor/zapret-openwrt.git^124c9f7983dcd6fddf46d3e863fc67853017c4fd'
+            echo 'src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main'
+            echo 'src-git passwall2 https://github.com/Openwrt-Passwall/openwrt-passwall2.git^8916e7fe55354771bfc22f854c328db5a9887ec3'
+          } >> feeds.conf.default
 
       - name: Add ISL download mirror
         run: sed -i 's|^PKG_SOURCE_URL:=https://libisl[.]sourceforge[.]io/$|PKG_SOURCE_URL:=https://downloads.sourceforge.net/project/libisl https://libisl.sourceforge.io/|' tools/isl/Makefile
@@ -149,6 +151,17 @@ jobs:
         run: |
           echo "CONFIG_PACKAGE_librespeed-go=y" >> .config
 
+      - name: Configure persistent compiler cache
+        env:
+          OPENWRT_CCACHE: ${{ runner.tool_cache }}/openwrt-bpi-r4-ccache
+        run: |
+          mkdir -p -m 700 "$OPENWRT_CCACHE"
+          printf 'max_size = 5G\ncompiler_check = content\n' > "$OPENWRT_CCACHE/ccache.conf"
+          {
+            echo 'CONFIG_CCACHE=y'
+            printf 'CONFIG_CCACHE_DIR="%s"\n' "$OPENWRT_CCACHE"
+          } >> .config
+
       - name: Run defconfig
         run: |
           make defconfig
@@ -179,8 +192,18 @@ jobs:
       - name: Build the firmware image
         run: |
           make defconfig
-          make download -j"$(nproc)" || make download -j1 V=s
+          # ponytail: cap download fan-out at 8; tune only after measuring network pressure.
+          make download -j8 || make download -j1 V=s
           make world -j"$(nproc)"
+
+      - name: Show compiler cache statistics
+        if: always()
+        env:
+          CCACHE_DIR: ${{ runner.tool_cache }}/openwrt-bpi-r4-ccache
+        run: |
+          if [ -x staging_dir/host/bin/ccache ]; then
+            staging_dir/host/bin/ccache --show-stats
+          fi
 
       - name: Patch the generated image with 8GB bl2
         env:
@@ -229,8 +252,9 @@ jobs:
           # The SD image was modified after OpenWrt generated sha256sums.
           (
             cd bin/targets/mediatek/filogic
-            find . -maxdepth 1 -type f ! -name sha256sums -print0 |
-              sort -z | xargs -0 sha256sum > sha256sums
+            find . -maxdepth 1 -type f ! -name 'sha256sums*' -print0 |
+              sort -z | xargs -0 sha256sum > sha256sums.new
+            mv sha256sums.new sha256sums
             sha256sum -c sha256sums
           )
 
