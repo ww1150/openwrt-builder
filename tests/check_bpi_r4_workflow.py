@@ -27,11 +27,23 @@ assert "${{ github.run_id }}-${{ github.run_attempt }}" in source
 assert 'make download -j8 || make download -j1 V=s' in source
 assert 'make world -j"$(nproc)"' in source
 assert '${{ runner.tool_cache }}/openwrt-bpi-r4-ccache' in source
+for option in ["IB", "SDK", "SDK_LLVM_BPF", "MAKE_TOOLCHAIN"]:
+    for text in [step("Configure firmware image"), (workflow.parent / "bpi-r4-main_router.yaml").read_text()]:
+        assert f"'# CONFIG_{option} is not set'" in text
 
 profile = (workflow.parents[2] / "configs/common/main-router").read_text()
 for package in ["block-mount", "e2fsprogs", "zapret2", "luci-app-zapret2", "dnsmasq-full", "netbird", "kmod-usb-net-cdc-mbim"]:
     assert f"CONFIG_PACKAGE_{package}=y" in profile, f"Custom package lost during merge: {package}"
 assert "CONFIG_LUCI_LANG_ru=y" in profile
+for package in ["qosify", "luci-app-qosify", "kmod-sched-bpf"]:
+    assert f"# CONFIG_PACKAGE_{package} is not set" in profile
+    assert f"CONFIG_PACKAGE_{package}=y" not in profile
+for package in ["sqm-scripts", "luci-app-sqm", "kmod-ifb", "kmod-sched-cake", "adguardhome", "stubby", "librespeed-go", "netbird"]:
+    assert f"CONFIG_PACKAGE_{package}=y" in profile
+for package in ["luci", "luci-light", "luci-ssl", "luci-theme-bootstrap"]:
+    assert f"# CONFIG_PACKAGE_{package} is not set" in profile
+for package in ["luci-theme-argon", "luci-app-package-manager", "rpcd-mod-rrdns", "uhttpd", "uhttpd-mod-ubus", "libustream-mbedtls", "px5g-mbedtls"]:
+    assert f"CONFIG_PACKAGE_{package}=y" in profile
 for obsolete in ["CONFIG_PACKAGE_wifi-scripts=y", "CONFIG_ALL_KMODS=y", "CONFIG_ALL_NONSHARED=y", "CONGIG_"]:
     assert obsolete not in profile
 openssl = (workflow.parents[2] / "configs/common/openssl").read_text()
@@ -51,6 +63,15 @@ for match in re.finditer(r"^        run: \|\n((?:          .*\n|\s*\n)+)", sourc
 
 with tempfile.TemporaryDirectory(prefix="bpi-r4-workflow-") as directory:
     root = Path(directory)
+    (root / "builder").mkdir()
+    (root / "builder/configs").symlink_to(workflow.parents[2] / "configs", target_is_directory=True)
+    subprocess.run(["bash", "-e", "-c", step("Configure firmware image")], cwd=root, check=True)
+    config_lines = (root / ".config").read_text().splitlines()
+    for option in ["IB", "SDK", "SDK_LLVM_BPF", "MAKE_TOOLCHAIN"]:
+        settings = [line for line in config_lines if line.startswith(f"CONFIG_{option}=") or line == f"# CONFIG_{option} is not set"]
+        assert settings[-1] == f"# CONFIG_{option} is not set", f"snapshot must not re-enable {option}"
+    assert "CONFIG_COLLECT_KERNEL_DEBUG=y" in config_lines
+    assert "CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y" in config_lines
     output = root / "bin/targets/mediatek/filogic"
     output.mkdir(parents=True)
     isl = root / "tools/isl/Makefile"

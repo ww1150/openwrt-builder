@@ -95,6 +95,9 @@ jobs:
             curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/optimize
             curl -SL https://raw.githubusercontent.com/ww1150/openwrt-builder/refs/heads/nhp/configs/common/sfp
           } >> .config
+          # Build firmware, not ImageBuilder kernels or developer toolchain archives.
+          printf '%s\n' '# CONFIG_IB is not set' '# CONFIG_SDK is not set' \
+            '# CONFIG_SDK_LLVM_BPF is not set' '# CONFIG_MAKE_TOOLCHAIN is not set' >> .config
 
       - name: Enable MLO
         run: |
